@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cotizacion #<%= header.CotizacionId %></title>
+  <style>
+    @page { margin: 20mm 15mm 20mm 15mm; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #222; margin: 0; padding: 0; }
+    .content { padding: 0 15px 20px 15px; }
+    .header { display:flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .brand { display:flex; align-items:center; gap:10px; }
+    .brand img { height: 42px; }
+    .meta { text-align: right; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; }
+    thead th { background:#f5f5f5; }
+    .tot { width: 260px; float: right; margin-top: 12px; }
+    .tot table { width:100%; }
+    .tot td { border: none; padding: 4px 6px; }
+    .tot tr td:first-child { text-align:right; }
+    .footnote { margin-top: 32px; font-size: 10px; color: #555; }
+    .terms { margin-top: 24px; page-break-before: always; }
+    .terms-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .terms-table th, .terms-table td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+    .terms-table th { background: #f5f5f5; font-weight: 600; text-align: left; font-size: 14px; }
+    .terms-table td.num { width: 36px; text-align: right; font-weight: 600; }
+    .typsa { margin-top: 20px; }
+    .typsa-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .typsa-table th, .typsa-table td { border: 1px solid #ddd; padding: 6px 8px; vertical-align: top; }
+    .typsa-table th { background: #f5f5f5; text-align: left; font-weight: 600; }
+    .final-note { font-size:10px; margin-top: 30px; text-align:center; line-height:1.4; page-break-inside: avoid; }
+    footer { font-size:10px; color:#666; text-align:left; margin: 20px 15px; }
+    @media print {
+      .no-print { display:none; }
+      .content { padding-bottom: 60px; }
+      footer { position: fixed; bottom: -5mm; left: 15mm; right: 15mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="text-align:right; margin-bottom:8px;">
+    <button onclick="window.print()">Imprimir / Guardar PDF</button>
+  </div>
+
+  <div class="content">
+  <div class="header">
+    <div class="brand">
+      <img src="/img/typsa.png" alt="TYPSA">
+      <div>
+        <div style="font-weight:700;">TYPSA</div>
+        <div style="font-size:11px;">Cotizacion de Laboratorio</div>
+      </div>
+    </div>
+    <div class="meta">
+      <div><strong>Cotizacion:</strong> #<%= header.CotizacionId %></div>
+      <div><strong>Fecha:</strong> <%= header.Fecha && header.Fecha.toISOString ? header.Fecha.toISOString().split('T')[0] : (header.Fecha || '') %></div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:12px;">
+    <strong>Cliente:</strong> <%= clienteNombre  %><br>
+    <strong>RUC:</strong> <%= clienteRuc || '-' %> &nbsp; &nbsp; <strong>Codigo:</strong> <%= clienteCodigo || '-' %><br>
+    <strong>Direccion:</strong> <%= clienteDireccion || '-' %><br>
+    <strong>Dirigido a:</strong> <%= contactoNombre || '-' %> &nbsp; &nbsp; <strong>Atencion:</strong> <%= header.EmpleadoNombre || header.EmpleadoId %>
+  </div>
+
+  <div style="margin-bottom:12px;">
+    <strong>Descripcion:</strong>
+    <div><%= header.Descripcion %></div>
+  </div>
+  <div style="margin-bottom:12px;">
+    <strong>Moneda:</strong> <%= (currency && currency.label) || 'Soles (PEN)' %>
+    <% if (currency && currency.code !== 'PEN') { %>
+      &nbsp; &nbsp; <strong>Tipo de cambio:</strong> <%= (currency.tipoCambio || 1).toFixed(4) %>
+    <% } %>
+  </div>
+
+  <% 
+    const groups = {};
+    const pushRow = (key, row) => {
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(row);
+    };
+    (items||[]).forEach(it => {
+      const key = it.MatrizNombre || 'Sin matriz';
+      pushRow(key, {
+        tipo: 'analisis',
+        Metodo: it.Metodo || '',
+        Codigo: it.Ensayo || it.AnalisisId || '',
+        Nombre: it.Nombre || '',
+        Acreditador: it.Acreditador || '-',
+        Empresa: it.Empresa || '-',
+        LDD: it.LDD || '',
+        LDC: it.LDC || '',
+        Precio: Number(it.PrecioBase || 0),
+        Cantidad: Number(it.Cantidad || 0)
+      });
+    });
+    (perfiles||[]).forEach(p => {
+      const key = p.MatrizNombre || 'Sin matriz';
+      pushRow(key, {
+        tipo: 'perfil',
+        Metodo: p.Metodo || '',
+        Codigo: p.PerfilId ? `P-${p.PerfilId}` : 'P',
+        Nombre: p.Nombre || p.PerfilId || '',
+        Acreditador: '-',
+        Empresa: 'Perfil',
+        LDD: '',
+        LDC: '',
+        Precio: Number(p.PrecioBase || 0),
+        Cantidad: Number(p.Cantidad || 0)
+      });
+    });
+    const groupNames = Object.keys(groups).sort((a,b)=>a.localeCompare(b));
+    const currencySymbol = (currency && currency.symbol) || 'S/';
+    const currencyFactor = (currency && currency.factor) || 1;
+    const convert = (val => Number(val||0) * currencyFactor);
+  %>
+
+  <% groupNames.forEach((gName, gi) => { const rows = groups[gName] || []; %>
+    <div style="margin: 14px 0; <%= gi>0 ? 'page-break-inside: avoid;' : '' %>">
+      <div style="font-weight:600; margin: 6px 0;">Servicio de monitoreo y analisis de <%= gName %></div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:10%">Codigo</th>
+            <th style="width:22%">Analisis</th>
+            <th style="width:14%">Acreditador</th>
+            <th style="width:12%">Metodo</th>
+            <th>Empresa</th>
+            <th style="width:9%">LDD</th>
+            <th style="width:9%">LDC</th>
+            <th style="width:10%">Precio (<%= currencySymbol %>)</th>
+            <th style="width:8%">Cant.</th>
+            <th style="width:12%">Subtotal (<%= currencySymbol %>)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% let gt = 0; rows.forEach(it => { const sub = Number(it.Precio||0)*Number(it.Cantidad||0); gt += sub; %>
+            <tr>
+              <td><%= it.Codigo || (it.tipo === 'perfil' ? 'P' : '') %></td>
+              <td><%= it.Nombre || '' %><% if (it.tipo === 'perfil') { %> (Perfil)<% } %></td>
+              <td><%= it.Acreditador || '-' %></td>
+              <td><%= it.Metodo || '-' %></td>
+              <td><%= it.Empresa || '-' %></td>
+              <td><%= it.LDD || '' %></td>
+              <td><%= it.LDC || '' %></td>
+              <td style="text-align:right;"><%= convert(it.Precio||0).toFixed(2) %></td>
+              <td style="text-align:center;"><%= it.Cantidad %></td>
+              <td style="text-align:right;"><%= convert(sub).toFixed(2) %></td>
+            </tr>
+          <% }) %>
+          <tr>
+            <td colspan="6" style="text-align:right; font-weight:600;">Subtotal matriz</td>
+            <td style="text-align:right; font-weight:600;"><%= currencySymbol %> <%= convert(gt).toFixed(2) %></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  <% }) %>
+
+  <% if ((extras||[]).length) { %>
+    <div style="margin: 16px 0;">
+      <div style="font-weight:600; margin: 6px 0;">Gastos del servicio</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:30%">Concepto</th>
+            <th>Descripción</th>
+            <th style="width:16%">Monto (<%= currencySymbol %>)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% extras.forEach(e => { %>
+            <tr>
+              <td><%= e.key %></td>
+              <td style="white-space:pre-line"><%= (e.desc||'') %></td>
+              <td style="text-align:right;"><%= currencySymbol %> <%= convert(e.monto||0).toFixed(2) %></td>
+            </tr>
+          <% }) %>
+          <tr>
+            <td colspan="2" style="text-align:right; font-weight:600;">Subtotal extras</td>
+            <td style="text-align:right; font-weight:600;"><%= currencySymbol %> <%= convert(totales.subtotalExtras||0).toFixed(2) %></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <div class="tot">
+    <table>
+      <tr><td><strong>Subtotal análisis:</strong></td><td style="text-align:right;"><%= currencySymbol %> <%= convert(totales.subtotalAnalisis||0).toFixed(2) %></td></tr>
+      <tr><td><strong>Subtotal perfiles:</strong></td><td style="text-align:right;"><%= currencySymbol %> <%= convert(totales.subtotalPerfiles||0).toFixed(2) %></td></tr>
+      <tr><td><strong>Subtotal items:</strong></td><td style="text-align:right;"><%= currencySymbol %> <%= convert(totales.subtotalItems||0).toFixed(2) %></td></tr>
+      <tr><td><strong>Subtotal extras:</strong></td><td style="text-align:right;"><%= currencySymbol %> <%= convert(totales.subtotalExtras||0).toFixed(2) %></td></tr>
+      <tr><td><strong>Subtotal:</strong></td><td style="text-align:right;"><%= currencySymbol %> <%= convert(totales.subtotal).toFixed(2) %></td></tr>
+      <tr><td><strong>Descuento (<%= header.Descuento %>%)</strong>:</td><td style="text-align:right;"><%= currencySymbol %> <%= convert(totales.descuentoAplicado).toFixed(2) %></td></tr>
+      <tr><td><strong>Total (sin IGV):</strong></td><td style="text-align:right;"><%= currencySymbol %> <%= convert(totales.total).toFixed(2) %></td></tr>
+      <tr><td><strong>IGV (18%):</strong></td><td style="text-align:right;"><%= currencySymbol %> <%= convert(totales.igv||0).toFixed(2) %></td></tr>
+      <tr><td><strong>Total (incl. IGV):</strong></td><td style="text-align:right;"><%= currencySymbol %> <%= convert(totales.totalConIgv||0).toFixed(2) %></td></tr>
+    </table>
+  </div>
+  <div class="footer-spacer"></div>
+  </div>
+
+  <div class="terms">
+    <table class="terms-table">
+      <thead>
+        <tr><th colspan="2">Terminos y Condiciones</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num"><strong>1. Fecha de entrega del informe de ensayo</strong></td>
+          <td>
+            7 dias habiles a partir del ingreso de las muestras en el laboratorio. Para los casos presuntivos de ensayo de Salmonella sp., 15 dias a partir del ingreso de muestras al laboratorio.
+          </td>
+        </tr>
+        <tr>
+          <td class="num"><strong>2. Horario de atencion de recepcion de muestras</strong></td>
+          <td>
+            De Lunes a Viernes de 08:00 a 17:30 horas; sabados y domingos previa coordinacion anticipada.
+          </td>
+        </tr>
+        <tr>
+          <td class="num"><strong>3. Forma de Pago</strong></td>
+          <td>
+            100% contra entrega de resultados.
+          </td>
+        </tr>
+        <tr>
+          <td class="num"><strong>4. Observaciones</strong></td>
+          <td>
+            Cotizacion valida por 30 dias.<br>
+            De ser aceptada nuestra propuesta, les solicitamos nos lo notifiquen haciendo referencia al numero de la presente cotizacion, mediante una orden de servicio, orden de compra o respuesta afirmativa via e-mail, a alguno de los siguientes correos electronicos: jcleon@typsa.es, joramirez@typsa.es, ncuadrado@typsa.es, jerobles@typsa.es, bovelasquez@typsa.es, jdvalle@typsa.es, calidadlabperu@typsa.es
+          </td>
+        </tr>
+        <tr>
+          <td class="num"><strong>5. Politicas de entrega y cambios</strong></td>
+          <td>
+            "No se aceptaran cambios en las cotizaciones ya aprobadas una vez recepcionadas las muestras. Todo servicio que sea igual o menor de S/ 500 el Cliente debera recoger sus documentos originales (Informes de ensayo) en la direccion del laboratorio. Las facturas seran enviadas electronicamente. Caso contrario el laboratorio se comunicara con el cliente para coordinar la entrega de los informes de ensayo."
+          </td>
+        </tr>
+        <tr>
+          <td class="num"><strong>6. Atencion a quejas</strong></td>
+          <td>
+            Para realizar una queja debe enviar un correo a: calidadlabperu@typsa.es; joramirez@typsa.es; labperu@typsa.es. Describiendo brevemente la queja, incluyendo como informacion los codigos de uno de los siguientes documentos: Cotizacion / Factura / Orden de Compra. La solucion a la queja sera remitida en un plazo maximo de 72 horas.
+          </td>
+        </tr>
+        <tr>
+          <td class="num"><strong>7. Principios generales de integridad</strong></td>
+          <td>
+            <ul style="margin:4px 0 0 18px; padding:0;">
+              <li>Respeto a las normas legales vigentes y observancia de los compromisos adoptados voluntariamente por TYPSA y reflejados en su Codigo Etico.</li>
+              <li>Compromiso activo de lucha contra la corrupcion y soborno en todas sus formas y tolerancia cero hacia estas conductas.</li>
+              <li>Exigencia de los mas altos estandares de integridad.</li>
+              <li>Rechazo de cualquier forma de remuneracion, dadiva o promesa que pretenda influir en una decision que favorezca a TYPSA.</li>
+              <li>Consolidacion de una cultura etica donde se promueva la comunicacion de conductas irregulares y se garantice la confidencialidad, la ausencia de represalias contra el denunciante de buena fe y los derechos de las partes implicadas.</li>
+              <li>Cooperacion plena con todo organismo legalmente constituido y con la legitimidad para investigar casos de corrupcion y soborno, que requiera nuestra colaboracion.</li>
+            </ul>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="typsa">
+    <table class="typsa-table">
+      <thead>
+        <tr><th colspan="2">DATOS TYPSA</th></tr>
+      </thead>
+      <tbody>
+        <tr><td style="width:28%">RAZON SOCIAL</td><td>TECNICA Y PROYECTOS, S.A. SUCURSAL DEL PERU</td></tr>
+        <tr><td>DIRECCION</td><td>AV. 28 DE JULIO N° 1044, DPTO. 501, URB. SAN ANTONIO - MIRAFLORES</td></tr>
+        <tr><td>R.U.C.</td><td>20503028655</td></tr>
+        <tr><td>BANCO</td><td>BBVA CONTINENTAL - SOLES</td></tr>
+        <tr><td>C.C.C.</td><td>0011-0910-0100092481-79</td></tr>
+        <tr><td>C.C.I.</td><td>011-910-000100092481-79</td></tr>
+        <tr><td>BANCO</td><td>BBVA CONTINENTAL - DOLARES</td></tr>
+        <tr><td>C.C.C.</td><td>0011-0910-0100092465-72</td></tr>
+        <tr><td>C.C.I.</td><td>011-910-000100092465-72</td></tr>
+        <tr><td>BANCO</td><td>BCP - SOLES</td></tr>
+        <tr><td>C.C.C.</td><td>193-2377137-0-83</td></tr>
+        <tr><td>C.C.I.</td><td>002-193-002377137083-12</td></tr>
+        <tr><td>BANCO</td><td>BCP - DOLARES</td></tr>
+        <tr><td>C.C.C.</td><td>193-2375433-1-81</td></tr>
+        <tr><td>C.C.I.</td><td>002-193-002375433181-19</td></tr>
+        <tr><td>DETRACCION</td><td>OPERACION SUJETA AL SISTEMA DE PAGO DE OBLIGACIONES TRIBUTARIAS CON EL GOBIERNO CENTRAL APLICABLE A MONTOS MAYORES A S/ 700.00</td></tr>
+        <tr><td></td><td>CTA. DETRACCION BANCO DE LA NACION 00-000-398454</td></tr>
+        <tr><td></td><td>CODIGO: 022 OTROS SERVICIOS EMPRESARIALES: 12%</td></tr>
+        <tr><td></td><td>TIPO: 01 - VENTA DE BIENES O PRESTACION DE SERVICIO</td></tr>
+        <tr><td>AGENTE DE RETENCION</td><td>TYPSA ES AGENTE DE RETENCION - NO RETENER EL 3%</td></tr>
+        <tr><td></td><td>(BASE LEGAL INC B. ART. 5 RES. SUP. N°037-2002/SUNAT)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="final-note">
+    Laboratorio de ensayo acreditado por el Organismo Peruano de Acreditación INACAL-DA.<br>
+    Registro nº LE-099.<br>
+    Dirección: Calle Delta nº 269, Urb. Parque Industrial Callao.<br>
+    Tlf: (+51 1) 711 9736
+  </div>
+  </div>
+  <footer>MC0503-5</footer>
+</body>
+</html>
+
+

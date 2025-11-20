@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es" class="h-100">
+
+<head>
+	<%- include('./partials/meta', { titulo: 'TYPSA Perú - Error' }) %>
+</head>
+
+
+<body class="d-flex flex-column h-100">
+	<%- include('./partials/navbar', { page: '/error', logged }) %>
+
+	<main class="m-auto">
+		<div class="alert alert-danger" role="alert">
+			<h4 class="alert-heading"><i class="bi bi-exclamation-triangle"></i> Error #<%- error %></h4>
+			<p class="mb-0"><%- msg %></p>
+			<hr>
+			<p class="mb-0">Para más información, por favor communíquese con el Departamento de Sistemas</p>
+		</div>
+	</main>
+
+	<%- include('./partials/scripts') %>
+	<%- include('./partials/footer') %>
+</body>
+
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <%- include('./partials/meta', { titulo: 'Análisis Internos' }) %>
+</head>
+<body>
+  <%- include('./partials/navbar', { page: '/analisisInternos', logged }) %>
+
+  <div class="container mt-5">
+    <h2>🧬 Análisis Internos </h2>
+
+
+    <input type="text" id="buscador" class="form-control mb-3" placeholder="Buscar análisis por nombre...">
+
+    <table class="table table-hover table-sm align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Ensayo</th>
+          <th>Nombre</th>
+          <th>Sección</th>
+          <th>Clave</th>
+          <th>Método Analítico</th>
+          <th>Técnica</th>
+          <th>Procedimiento</th>
+          <th>Validado</th>
+          <th>Acreditado</th>
+          <th>Tasa</th>
+          <th>Coste</th>
+          <th>Subcontratado</th>
+        </tr>
+      </thead>
+      <tbody id="tablaAnalisis">
+        <% analisis.forEach(a => { %>
+          <tr>
+            <td><%= a.Ensayo %></td>
+            <td><%= a.Nombre %></td>
+            <td><%= a.Seccion %></td>
+            <td><%= a.Clave_Abreviada %></td>
+            <td><%= a.Metodo_Analitico %></td>
+            <td><%= a.Tecnica %></td>
+            <td><%= a.Procedimiento %></td>
+            <td><%= a.Metodo_Validado ? '✔️' : '' %></td>
+            <td><%= a.Acreditada ? '✔️' : '' %></td>
+            <td><%= a.Tasa || '' %></td>
+            <td><%= a.Coste_Estimado || '' %></td>
+            <td><%= a.Subcontratado ? 'Sí' : 'No' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    // 🔍 Buscador simple por nombre
+    document.getElementById('buscador').addEventListener('input', function () {
+      const filtro = this.value.toLowerCase();
+      document.querySelectorAll('#tablaAnalisis tr').forEach(fila => {
+        const texto = fila.textContent.toLowerCase();
+        fila.style.display = texto.includes(filtro) ? '' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>

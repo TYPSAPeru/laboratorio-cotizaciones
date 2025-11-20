@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <%- include('./partials/meta', { titulo: 'Matrices de Laboratorio' }) %>
+  <style>
+    .wrap { max-width: 900px; margin: 24px auto; }
+  </style>
+</head>
+<body>
+  <%- include('./partials/navbar', { page: '/matrices', logged }) %>
+  <div class="wrap">
+    <h2 class="mb-3">Matrices de Laboratorio</h2>
+    <p class="text-muted">Este catálogo se sincroniza automáticamente desde la tabla de solo lectura <code>dbo.MES_Materiales</code>.</p>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-warning">No se pudieron cargar algunas matrices: <%= error %></div>
+    <% } %>
+
+    <div class="table-responsive">
+      <table class="table table-bordered table-sm">
+        <thead>
+          <tr>
+            <th style="width:160px;">Material</th>
+            <th>Descripción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% (matrices || []).forEach(m => { %>
+            <tr>
+              <td><%= m.MatrizId %></td>
+              <td><%= m.Nombre %></td>
+            </tr>
+          <% }) %>
+          <% if (!matrices || !matrices.length) { %>
+            <tr><td colspan="2" class="text-center text-muted">Sin resultados</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-3">
+      <a href="/cotizaciones" class="btn btn-secondary">Volver</a>
+    </div>
+  </div>
+  <%- include('./partials/scripts') %>
+  <%- include('./partials/footer') %>
+</body>
+</html>

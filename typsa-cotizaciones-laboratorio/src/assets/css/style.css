@@ -1,0 +1,54 @@
+@font-face {
+    font-family: Roboto;
+    src: url('/vendor/roboto.woff2') format('woff2');
+}
+
+body {
+    font-family: Roboto !important;
+    font-weight: 500;
+}
+
+.text-justify {
+    text-align: justify;
+}
+
+.link {
+    color: #0066CC;
+    font-weight: 900;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.link:hover {
+    color: #5599DD;
+    font-weight: 1100;
+    text-decoration: none;
+}
+
+.popover {
+    max-width: 50%;
+    /* Max Width of the popover (depending on the container!) */
+    max-height: 50%;
+    /* Max Width of the popover (depending on the container!) */
+    overflow-y: auto;
+}
+
+/* width */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+    background: #888;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}

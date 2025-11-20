@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es" class="h-100">
+
+<head>
+	<%- include('./partials/meta', { titulo: 'TYPSA Perú - Laboratorio' }) %>
+</head>
+
+
+<body class="d-flex flex-column h-100">
+	<%- include('./partials/navbar', { page: '/inicio', logged }) %>
+	<main class="container mt-5">
+		<h1 class=" text-center fw-bold mb-5">
+			Cotizaciones de Laboratorio
+		</h1>
+		<%
+			const permisosCfg = permisos || {};
+			const permisoFn = (typeof hasPermiso === 'function') ? hasPermiso : (() => false);
+			const showCotizaciones = permisoFn(permisosCfg.cotizaciones || 'LAB_COTIZACIONES');
+			const showAnalisis = permisoFn(permisosCfg.analisis || 'LAB_ANALISIS');
+			const showMatrices = permisoFn(permisosCfg.matrices || 'LAB_MATRICES');
+			const showPerfiles = permisoFn(permisosCfg.perfiles || 'LAB_PERFILES');
+		%>
+		<div class="row">
+			<% if (showCotizaciones) { %>
+			<div class="col-xl-3 col-lg-4 col-md-5 col-sm-5 mb-5">
+				<div class="card h-100">
+					<div class="card-body">
+						<h5 class="card-title">
+							<i class="bi bi-clipboard"></i>
+							Cotizaciones
+						</h5>
+						<p class="card-text">Listado de Cotizaciones.</p>
+					</div>
+					<div class="card-footer text-end">
+						<a href="/cotizaciones" class="btn btn-primary btn-sm">Ver</a>
+					</div>
+				</div>
+			</div>
+			<% } %>
+			<% if (showAnalisis) { %>
+			<div class="col-xl-3 col-lg-4 col-md-5 col-sm-5 mb-5">
+				<div class="card h-100">
+					<div class="card-body">
+						<h5 class="card-title">
+							<i class="bi bi-file-plus"></i>
+							Pruebas
+						</h5>
+						<p class="card-text">Listado y Edición de Pruebas.</p>
+					</div>
+					<div class="card-footer text-end">
+						<a href="/analisis" class="btn btn-primary btn-sm">Ver</a>
+					</div>
+				</div>
+			</div>
+			<% } %>
+			<% if (showMatrices) { %>
+			<div class="col-xl-3 col-lg-4 col-md-5 col-sm-5 mb-5">
+				<div class="card h-100">
+					<div class="card-body">
+						<h5 class="card-title">
+							<i class="bi bi-diagram-2"></i>
+							Matrices
+						</h5>
+						<p class="card-text">Gestiona y crea las matrices.</p>
+					</div>
+					<div class="card-footer text-end">
+						<a href="/matrices" class="btn btn-success btn-sm"> Ver</a>
+					</div>
+				</div>
+			</div>
+			<% } %>
+			<% if (showPerfiles) { %>
+			<div class="col-xl-3 col-lg-4 col-md-5 col-sm-5 mb-5">
+				<div class="card h-100">
+					<div class="card-body">
+						<h5 class="card-title">
+							<i class="bi bi-collection"></i>
+							Perfiles
+						</h5>
+						<p class="card-text">Configura los paquetes de análisis y sus precios.</p>
+					</div>
+					<div class="card-footer text-end">
+						<a href="/perfiles" class="btn btn-outline-primary btn-sm">Gestionar</a>
+					</div>
+				</div>
+			</div>
+			<% } %>
+		</div>
+	</main>
+
+
+	<%- include('./partials/scripts') %>
+	<%- include('./partials/footer') %>
+</body>
+
+</html>
+

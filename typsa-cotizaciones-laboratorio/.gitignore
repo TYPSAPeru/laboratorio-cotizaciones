@@ -1,0 +1,8 @@
+**/node_modules/*
+**/uploads/*
+**/logs/*
+**/iisnode/*
+web.config
+package-lock.json
+test.js
+.env

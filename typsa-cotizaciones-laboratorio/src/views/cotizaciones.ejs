@@ -1,0 +1,80 @@
+S
+y
+s
+t
+e
+m
+.
+O
+b
+j
+e
+c
+t
+[
+]
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <%- include('./partials/meta', { titulo: 'TYPSA Perú - Cotizaciones' }) %>
+  <meta charset="UTF-8">
+</head>
+<body>
+  <%- include('./partials/navbar', { page: '/cotizaciones', logged }) %>
+
+  <div class="container mt-5">
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-warning">No se pudo cargar algunos datos: <%= error %></div>
+    <% } %>
+    <h1 class="text-center mb-4">Cotizaciones de Laboratorio</h1>
+
+    <a href="/cotizaciones/nueva" class="btn btn-success mb-3">
+      + Nueva Cotizacion
+    </a>
+
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Fecha</th>
+          <th>Descripción</th>
+          <th>Empleado</th>
+          <th>Cliente</th>
+          <th>Moneda</th>
+          <th>Descuento</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% (cotizaciones || []).forEach(c => { %>
+          <tr>
+            <td><%= c.CotizacionId %></td>
+            <td><%= (c.Fecha && c.Fecha.toISOString ? c.Fecha.toISOString().split('T')[0] : (c.Fecha || '')) %></td>
+            <td><%= c.Descripcion %></td>
+            <td><%= c.Empleado %></td>
+            <td><%= c.Cliente %></td>
+            <td><%= (c.Moneda || 'PEN').toUpperCase() %></td>
+            <td><%= c.Descuento %></td>
+            <td><%= c.Aprobada ? 'Aprobada' : 'Pendiente' %></td>
+            <td class="text-nowrap">
+              <a class="btn btn-sm btn-outline-primary" href="/cotizaciones/<%= c.CotizacionId %>">Ver</a>
+              <% if (!c.Aprobada) { %>
+              <form action="/cotizaciones/<%= c.CotizacionId %>/aprobar" method="POST" style="display:inline" onsubmit="return confirm('Aprobar cotizacion #<%= c.CotizacionId %>?');">
+                <button class="btn btn-sm btn-success">Aprobar</button>
+              </form>
+              <% } %>
+              <form action="/cotizaciones/<%= c.CotizacionId %>/eliminar" method="POST" style="display:inline" onsubmit="return confirm('¿Eliminar cotizacion #<%= c.CotizacionId %>? Esta acción no se puede deshacer.');">
+                <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <%- include('./partials/scripts') %>
+  <%- include('./partials/footer') %>
+</body>
+</html>

@@ -1,0 +1,73 @@
+require('dotenv').config();
+require('./modules/logger');
+const SQL = require('./modules/database');
+process.permisos = require('./modules/permisos.json');
+
+
+const express = require('express');
+const app = express();
+
+const cookieParser = require("cookie-parser");
+app.use(cookieParser());
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.set('trust proxy', true);
+app.set('view engine', 'ejs');
+app.set('views', __dirname + '/views');
+app.use(express.static(__dirname + '/assets'));
+
+app.use('*', async function (req, res, next) {
+	if (process.env.NODE_ENV === 'development') {
+		req.logged = {
+			EmpleadoId: 1, // usa un ID real de tu tabla Empleados
+			Nombre: 'Desarrollador Local',
+			Permisos: ['admin'],
+			TienePermiso: () => true
+		};
+		return next();
+	}
+	req.logged = false;
+
+	let UUID = process.env.UUID || req.cookies.UUID || null;
+	if (!UUID) return res.redirect('https://login.typsa.pe/');
+
+	var result = await SQL.Execute('main', 'Sesiones_Leer_UUID', { UUID });
+	if (result.error) return res.render('error', { logged: req.logged, error: 'I3K77R', msg: '' });
+	if (result.length == 0) return res.redirect('https://login.typsa.pe/');
+	if (Date.now() > result[0].Expiracion.getTime()) return res.redirect('https://login.typsa.pe/');
+
+	var logged = result[0];
+	logged.Permisos = [];
+
+	var result = await SQL.Execute('main', 'EmpleadosPermisos_Leer_EmpleadoId', { EmpleadoId: logged.EmpleadoId });
+	if (result.error) return res.render('error', { logged: req.logged, error: 'U3J77C', msg: ''  });
+	for (var permiso of result)
+		logged.Permisos.push(permiso.Nombre);
+
+	logged.TienePermiso = function (requerido = []) {
+		if (typeof requerido == 'string') requerido = [requerido];
+		return requerido.every(permiso => this.Permisos.includes(permiso));
+	}
+
+	req.logged = logged;
+	return next();
+});
+
+app.use('/', require('./routes/general'));
+app.use('/analisis', require('./routes/analisis'));
+app.use('/cotizaciones', require('./routes/cotizacion'));
+app.use('/analisisInternos', require('./routes/analisis'));
+app.use('/matrices', require('./routes/matriz'));
+
+app.listen(process.env.PORT, async function () {
+	console.log("========== Servidor Iniciado ==========");
+	console.log("Zona Horaria:", process.env.TZ);
+	console.log("Entorno:", process.env.NODE_ENV);
+	console.log("Host:", process.env.HOST);
+	console.log("Puerto:", process.env.PORT);
+	console.log("Datos:", process.env.DB_DATA);
+	console.log("=======================================");
+});
+

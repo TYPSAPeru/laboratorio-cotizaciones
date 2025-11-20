@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <%- include('./partials/meta', { titulo: 'TYPSA Perú - Análisis Combinados' }) %>
+</head>
+<body>
+  <%- include('./partials/navbar', { page: '/analisis', logged }) %>
+  <div class="container mt-5">
+  <h1>📋 Análisis de Laboratorio</h1>
+  <p class="text-muted">Internos (solo lectura) y Externos (editables)</p>
+  <div class="mb-3 mt-3">
+    <input
+      type="text"
+      id="searchInput"
+      class="form-control"
+      placeholder="Buscar por nombre, ensayo o empresa..."
+    />
+  </div>
+  <div class="d-flex align-items-center gap-3 mb-2">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="chkAll">
+      <label class="form-check-label" for="chkAll">Seleccionar todos</label>
+    </div>
+    <button class="btn btn-success btn-sm" id="btnToCot">Agregar a cotizacion</button>
+  </div>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th style="width:32px;"></th>
+        <th>Ensayo</th>
+        <th>Nombre</th>
+        <th>Sección</th>
+        <th>Técnica</th>
+        <th>Empresa</th>
+        <th>Precio</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="analisisTableBody">
+      <% analisis.forEach(a => { %>
+        <tr>
+          <td>
+            <input type="checkbox" class="form-check-input sel-analisis"
+              data-ensayo="<%= a.Ensayo %>" data-nombre="<%= a.Nombre %>"
+              data-empresa="<%= a.Empresa %>" data-precio="<%= a.Precio %>">
+          </td>
+          <td><%= a.Ensayo %></td>
+          <td><%= a.Nombre %></td>
+          <td><%= a.Seccion %></td>
+          <td><%= a.Tecnica %></td>
+          <td><%= a.Empresa || '-' %></td>
+          <td><%= a.Precio || '-' %></td>
+          <td>
+            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editarModal"
+              data-ensayo="<%= a.Ensayo %>" data-nombre="<%= a.Nombre %>" data-analisisid="<%= a.AnalisisId %>"
+              data-empresa="<%= a.Empresa %>" data-precio="<%= a.Precio %>"
+              data-observaciones="<%= a.Observaciones %>" data-acreditador="<%= a.AcreditadorId || '' %>">
+              Editar
+            </button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <!-- Modal editar -->
+  <div class="modal fade" id="editarModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" method="POST" action="/analisis/guardar">
+        <div class="modal-header"><h5 class="modal-title">Editar análisis externo</h5></div>
+        <div class="modal-body">
+          <input type="hidden" name="Ensayo" id="Ensayo">
+          <input type="hidden" name="AnalisisId" id="AnalisisId">
+          <input type="hidden" name="Nombre" id="NombreAnalisis">
+          <div class="mb-2"><label>Empresa</label><input name="Empresa" id="Empresa" class="form-control"></div>
+          <div class="mb-2"><label>Precio</label><input name="Precio" id="Precio" type="number" step="0.01" class="form-control"></div>
+          <div class="mb-2">
+            <label>Acreditador</label>
+            <select name="AcreditadorId" id="AcreditadorId" class="form-select">
+              <option value="">Sin acreditador</option>
+              <% (acreditadores || []).forEach(acc => { %>
+                <option value="<%= acc.AcreditadorId %>"><%= acc.Nombre %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="mb-2"><label>Observaciones</label><textarea name="Observaciones" id="Observaciones" class="form-control"></textarea></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-success">Guardar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const modal = document.getElementById('editarModal');
+    modal.addEventListener('show.bs.modal', e => {
+      const btn = e.relatedTarget;
+      document.getElementById('Ensayo').value = btn.dataset.ensayo;
+      document.getElementById('AnalisisId').value = btn.dataset.analisisid || '';
+      document.getElementById('NombreAnalisis').value = btn.dataset.nombre || '';
+      document.getElementById('Empresa').value = btn.dataset.empresa || '';
+      document.getElementById('Precio').value = btn.dataset.precio || '';
+      document.getElementById('AcreditadorId').value = btn.dataset.acreditador || '';
+      document.getElementById('Observaciones').value = btn.dataset.observaciones || '';
+    });
+  </script>
+
+  <script>
+    // Búsqueda en vivo (insensible a acentos)
+    const searchInput = document.getElementById('searchInput');
+    const rows = () => Array.from(document.querySelectorAll('#analisisTableBody tr'));
+    const norm = (s) => (s || '').toString().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    searchInput.addEventListener('input', () => {
+      const q = norm(searchInput.value);
+      rows().forEach(tr => {
+        const txt = norm(tr.textContent);
+        tr.style.display = txt.includes(q) ? '' : 'none';
+      });
+    });
+
+    // Seleccion y envio a cotizacion
+    const chkAll = document.getElementById('chkAll');
+    const btnToCot = document.getElementById('btnToCot');
+    chkAll.addEventListener('change', () => {
+      document.querySelectorAll('#analisisTableBody .sel-analisis').forEach(cb => {
+        if (cb.closest('tr').style.display !== 'none') cb.checked = chkAll.checked;
+      });
+    });
+    btnToCot.addEventListener('click', () => {
+      const selected = Array.from(document.querySelectorAll('#analisisTableBody .sel-analisis:checked'))
+        .map(cb => cb.dataset.ensayo)
+        .filter(Boolean);
+      if (!selected.length) { alert('Seleccione al menos un analisis'); return; }
+      const url = '/cotizaciones/nueva?ensayos=' + encodeURIComponent(selected.join(','));
+      window.location.href = url;
+    });
+  </script>
+
+    <%- include('./partials/scripts') %>
+  <%- include('./partials/footer') %>
+  </div>
+</body>
+</html>
+
+

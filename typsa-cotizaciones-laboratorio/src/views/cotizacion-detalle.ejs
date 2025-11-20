@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <%- include('./partials/meta', { titulo: 'Detalle de Cotizacion' }) %>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+<body class="container mt-4">
+  <%- include('./partials/navbar', { page: '/cotizaciones', logged }) %>
+
+  <h3 class="mb-3">Cotizacion #<%= header.CotizacionId %></h3>
+  <div class="row mb-2">
+    <div class="col-md-3"><strong>Fecha:</strong> <%= header.Fecha && header.Fecha.toISOString ? header.Fecha.toISOString().split('T')[0] : (header.Fecha || '') %></div>
+    <div class="col-md-3"><strong>Cliente:</strong> <%= clienteNombre %></div>
+    <div class="col-md-3"><strong>RUC:</strong> <%= clienteRuc || '-' %></div>
+    <div class="col-md-3"><strong>Codigo:</strong> <%= clienteCodigo || '-' %> <span class="badge <%= header.Aprobada ? 'bg-success' : 'bg-secondary' %>"><%= header.Aprobada ? 'Aprobada' : 'Pendiente' %></span></div>
+  </div>
+  <div class="row mb-3">
+    <div class="col-md-6"><strong>Direccion:</strong> <%= clienteDireccion || '-' %></div>
+    <div class="col-md-6"><strong>Dirigido a:</strong> <%= contactoNombre || '-' %></div>
+  </div>
+  <div class="row mb-3">
+    <div class="col-md-4"><strong>Moneda:</strong> <%= (currency && currency.label) || 'Soles (PEN)' %></div>
+    <% if (currency && currency.code !== 'PEN') { %>
+      <div class="col-md-4"><strong>Tipo de cambio:</strong> <%= (currency.tipoCambio || 1).toFixed(4) %></div>
+    <% } %>
+  </div>
+  <div class="mb-3"><strong>Descripcion:</strong><br><%= header.Descripcion %></div>
+
+  <% 
+    const G = {};
+    const pushRow = (key, row) => {
+      if (!G[key]) G[key] = [];
+      G[key].push(row);
+    };
+    (items||[]).forEach(it=>{ 
+      const k = it.MatrizNombre || 'Sin matriz'; 
+      pushRow(k, {
+        tipo: 'analisis',
+        Codigo: it.Ensayo || it.AnalisisId || '',
+        Nombre: it.Nombre || '',
+        Empresa: it.Empresa || '-',
+        Metodo: it.Metodo || '-',
+        Metodo: it.Metodo || '-',
+        LDD: it.LDD || '',
+        LDC: it.LDC || '',
+        Precio: Number(it.PrecioBase || 0),
+        Cantidad: Number(it.Cantidad || 0)
+      });
+    });
+    (perfiles||[]).forEach(p => {
+      const k = p.MatrizNombre || 'Sin matriz';
+      pushRow(k, {
+        tipo: 'perfil',
+        Codigo: p.PerfilId ? `P-${p.PerfilId}` : 'P',
+        Nombre: p.Nombre || p.PerfilId || '',
+        Empresa: 'Perfil',
+        Metodo: p.Metodo || '-',
+        LDD: '',
+        LDC: '',
+        Precio: Number(p.PrecioBase || 0),
+        Cantidad: Number(p.Cantidad || 0)
+      });
+    });
+    const names = Object.keys(G).sort((a,b)=>a.localeCompare(b));
+    const currencySymbol = (currency && currency.symbol) || 'S/';
+    const currencyFactor = (currency && currency.factor) || 1;
+    const convert = (val => Number(val||0) * currencyFactor);
+  %>
+  <% names.forEach(n => { const rows = G[n]||[]; %>
+    <div class="table-responsive mb-3">
+      <div class="fw-bold mb-1">Servicio de monitoreo y analisis de <%= n %></div>
+      <table class="table table-bordered table-sm align-middle">
+        <thead>
+          <tr>
+            <th>Codigo</th><th>Analisis</th><th>Metodo</th><th>Empresa</th><th>LDD</th><th>LDC</th><th>Precio (<%= currencySymbol %>)</th><th>Cantidad</th><th>Subtotal (<%= currencySymbol %>)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% let subm = 0; rows.forEach(it => { const sub = Number(it.Precio||0)*Number(it.Cantidad||0); subm += sub; %>
+            <tr>
+              <td><%= it.Codigo || (it.tipo === 'perfil' ? 'P' : '') %></td>
+              <td><%= it.Nombre || '' %><% if (it.tipo === 'perfil') { %> (Perfil)<% } %></td>
+              <td><%= it.Metodo || '-' %></td>
+              <td><%= it.Empresa || '-' %></td>
+              <td><%= it.LDD || '' %></td>
+              <td><%= it.LDC || '' %></td>
+              <td><%= currencySymbol %> <%= convert(it.Precio||0).toFixed(2) %></td>
+              <td><%= it.Cantidad %></td>
+              <td><%= currencySymbol %> <%= convert(sub).toFixed(2) %></td>
+            </tr>
+          <% }) %>
+          <tr>
+            <td colspan="6" class="text-end"><strong>Subtotal matriz</strong></td>
+            <td><strong><%= currencySymbol %> <%= convert(subm).toFixed(2) %></strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  <% }) %>
+
+  <% if ((extras||[]).length) { %>
+    <div class="table-responsive mb-3">
+      <div class="fw-bold mb-1">Gastos del servicio</div>
+      <table class="table table-bordered table-sm align-middle">
+        <thead>
+          <tr><th style="width:35%">Concepto</th><th>Descripción</th><th style="width:16%">Monto (<%= currencySymbol %>)</th></tr>
+        </thead>
+        <tbody>
+          <% extras.forEach(e => { %>
+            <tr>
+              <td><%= e.key %></td>
+              <td style="white-space:pre-line"><%= (e.desc||'') %></td>
+              <td><%= currencySymbol %> <%= convert(e.monto||0).toFixed(2) %></td>
+            </tr>
+          <% }) %>
+          <tr>
+            <td colspan="2" class="text-end"><strong>Subtotal extras</strong></td>
+            <td><strong><%= currencySymbol %> <%= convert(totales.subtotalExtras||0).toFixed(2) %></strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <div class="text-end mt-3">
+    <div><strong>Subtotal análisis:</strong> <%= currencySymbol %> <%= convert(totales.subtotalAnalisis||0).toFixed(2) %></div>
+    <div><strong>Subtotal perfiles:</strong> <%= currencySymbol %> <%= convert(totales.subtotalPerfiles||0).toFixed(2) %></div>
+    <div><strong>Subtotal items:</strong> <%= currencySymbol %> <%= convert(totales.subtotalItems||0).toFixed(2) %></div>
+    <div><strong>Subtotal extras:</strong> <%= currencySymbol %> <%= convert(totales.subtotalExtras||0).toFixed(2) %></div>
+    <div><strong>Subtotal:</strong> <%= currencySymbol %> <%= convert(totales.subtotal).toFixed(2) %></div>
+    <div><strong>Descuento (<%= header.Descuento %>%)</strong>: <%= currencySymbol %> <%= convert(totales.descuentoAplicado).toFixed(2) %></div>
+    <div><strong>IGV (18%):</strong> <%= currencySymbol %> <%= convert(totales.igv||0).toFixed(2) %></div>
+    <div class="fs-5"><strong>Total:</strong> <%= currencySymbol %> <%= convert(totales.total).toFixed(2) %></div>
+    <div><strong>Total (incl. IGV):</strong> <%= currencySymbol %> <%= convert(totales.totalConIgv).toFixed(2) %></div>
+  </div>
+
+  <div class="text-end mt-4">
+    <a href="/cotizaciones/<%= header.CotizacionId %>/imprimir" class="btn btn-outline-secondary" target="_blank">Imprimir / PDF</a>
+    <% if (header.Aprobada) { %>
+    <a href="/cotizaciones/<%= header.CotizacionId %>/solicitud" class="btn btn-outline-secondary" target="_blank">Solicitud de servicios</a>
+    <% } %>
+    <% if (!header.Aprobada) { %>
+    <form action="/cotizaciones/<%= header.CotizacionId %>/aprobar" method="POST" style="display:inline" onsubmit="return confirm('¿Aprobar esta cotizacion?');">
+      <button class="btn btn-success">Aprobar solicitud</button>
+    </form>
+    <% } %>
+    <form action="/cotizaciones/<%= header.CotizacionId %>/eliminar" method="POST" style="display:inline" onsubmit="return confirm('Eliminar esta cotizacion? Esta accion no se puede deshacer.');">
+      <button class="btn btn-outline-danger">Eliminar</button>
+    </form>
+    <a href="/cotizaciones" class="btn btn-secondary">Volver</a>
+  </div>
+
+  <%- include('./partials/scripts') %>
+  <%- include('./partials/footer') %>
+</body>
+</html>

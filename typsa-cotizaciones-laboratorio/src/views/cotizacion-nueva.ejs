@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <%- include('./partials/meta', { titulo: 'Nueva Cotización' }) %>
+  <style>
+    .suggestions { position: relative; }
+    .suggestions-list { position: absolute; z-index: 1000; width: 100%; max-height: 240px; overflow: auto; background: #fff; border: 1px solid #ddd; border-radius: .25rem; }
+    .suggestions-list .item { padding: .5rem .75rem; cursor: pointer; }
+    .suggestions-list .item:hover { background: #f5f5f5; }
+  </style>
+  </head>
+<body class="container mt-4">
+  <%- include('./partials/navbar', { page: '/cotizaciones', logged }) %>
+
+  <% if (typeof error !== 'undefined' && error) { %>
+    <div class="alert alert-warning my-3">No se pudo cargar algunos datos: <%= error %></div>
+  <% } %>
+
+  <h2 class="mb-3">Nueva Cotización</h2>
+
+  <form id="form-cotizacion" method="POST" action="/cotizaciones/crear" class="mb-4">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Fecha</label>
+        <input type="date" name="Fecha" class="form-control" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Descripción</label>
+        <input type="text" name="Descripcion" class="form-control" placeholder="Descripción" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Descuento (%)</label>
+        <input type="number" name="Descuento" id="Descuento" step="0.01" class="form-control" value="0">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Moneda</label>
+        <select name="Moneda" id="Moneda" class="form-select">
+          <option value="PEN" selected>Soles (PEN)</option>
+          <option value="USD">Dólares (USD)</option>
+          <option value="EUR">Euros (EUR)</option>
+        </select>
+      </div>
+    </div>
+    <div class="row g-3 mt-1">
+      <div class="col-md-3">
+        <label class="form-label">Tipo de cambio</label>
+        <input type="number" step="0.0001" min="0" name="TipoCambio" id="TipoCambio" class="form-control" value="1" required>
+        <div class="form-text">Soles por unidad de moneda extranjera</div>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">Cliente</label>
+        <select name="ClienteId" id="ClienteId" class="form-select" required>
+          <option value="" disabled selected>Seleccione un cliente</option>
+          <% (clientes || []).forEach(c => { %>
+            <option value="<%= c.Codigo %>" data-codigo="<%= c.Codigo %>"><%= c.Nombre %></option>
+          <% }) %>
+        </select>
+        <% if (!clientes || clientes.length === 0) { %>
+          <div class="form-text text-warning">No hay clientes disponibles.</div>
+        <% } %>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Dirigido a (Contacto)</label>
+        <select name="ContactoId" id="ContactoId" class="form-select">
+          <option value="" selected>Seleccione un contacto</option>
+        </select>
+      </div>
+    </div>
+    <div class="row g-3 mt-1">
+      <div class="col-md-6">
+        <label class="form-label">Empleado</label>
+        <select name="EmpleadoId" class="form-select" required>
+          <option value="" disabled selected>Seleccione un empleado</option>
+          <% (empleados || []).forEach(e => { %>
+            <option value="<%= e.EmpleadoId %>"><%= e.Nombre %></option>
+          <% }) %>
+        </select>
+        <% if (!empleados || empleados.length === 0) { %>
+          <div class="form-text text-warning">No hay empleados disponibles.</div>
+        <% } %>
+      </div>
+    </div>
+
+    <hr class="my-4">
+    <h5>Gastos del servicio</h5>
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label">Personal (descripción)</label>
+        <textarea name="Personal" class="form-control" rows="2" placeholder="p.ej. 02 Analistas por 08 dias"></textarea>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Personal (monto)</label>
+        <input type="number" step="0.01" name="PersonalPrecio" class="form-control" value="0">
+      </div>
+
+      <div class="col-md-8">
+        <label class="form-label">Gastos Operativos</label>
+        <textarea name="Operativos" class="form-control" rows="4" placeholder="TYPSA: Traslado, alimentación, hospedaje...&#10;CLIENTE: Facilidades de acceso... "></textarea>
+      </div>
+        <div class="col-md-4">
+        <label class="form-label">Operativos (monto)</label>
+        <input type="number" step="0.01" name="OperativosPrecio" class="form-control" value="0">
+      </div>
+
+      <div class="col-md-8">
+        <label class="form-label">Consideraciones</label>
+        <textarea name="Consideraciones" class="form-control" rows="2" placeholder="p.ej. Grupo electrógeno + combustible"></textarea>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Consideraciones (monto)</label>
+        <input type="number" step="0.01" name="ConsideracionesPrecio" class="form-control" value="0">
+      </div>
+
+      <div class="col-md-8">
+        <label class="form-label">Informe</label>
+        <textarea name="Informe" class="form-control" rows="2" placeholder="Se entregará informe de ensayo en formato digital"></textarea>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Informe (monto)</label>
+        <input type="number" step="0.01" name="InformePrecio" class="form-control" value="0">
+      </div>
+
+      <div class="col-md-8">
+        <label class="form-label">Otros generales</label>
+        <textarea name="Otros" class="form-control" rows="4" placeholder="Visita técnica, traslados, etc."></textarea>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Otros (monto)</label>
+        <input type="number" step="0.01" name="OtrosPrecio" class="form-control" value="0">
+      </div>
+    </div>
+
+    <hr class="my-4">
+    <h5>Perfiles (paquetes)</h5>
+    <div class="row g-3 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label">Perfil</label>
+        <select id="perfilSelect" class="form-select">
+          <option value="" selected>Seleccione un perfil</option>
+          <% (perfiles || []).forEach(p => { %>
+            <option value="<%= p.PerfilId %>" data-precio="<%= (p.PrecioBase != null ? Number(p.PrecioBase).toFixed(2) : '') %>"><%= p.Nombre || p.PerfilId %></option>
+          <% }) %>
+        </select>
+        <% if (!perfiles || !perfiles.length) { %>
+          <div class="form-text text-warning">No hay perfiles configurados.</div>
+        <% } %>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Matriz</label>
+        <select id="perfilMatriz" class="form-select">
+          <option value="">Seleccione...</option>
+          <% (matrices || []).forEach(m => { %>
+            <option value="<%= m.MatrizId %>"><%= m.Nombre %></option>
+          <% }) %>
+        </select>
+        <% if (!matrices || !matrices.length) { %>
+          <div class="form-text text-warning">No hay matrices registradas.</div>
+        <% } %>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Precio base (S/)</label>
+        <input type="number" id="perfilPrecio" class="form-control" step="0.01" placeholder="0.00">
+      </div>
+      <div class="col-md-1">
+        <label class="form-label">Cantidad</label>
+        <input type="number" id="perfilCantidad" class="form-control" value="1" min="1">
+      </div>
+      <div class="col-md-1">
+        <button type="button" id="btnAgregarPerfil" class="btn btn-outline-primary w-100">+</button>
+      </div>
+    </div>
+
+    <div class="table-responsive mt-3">
+      <table class="table table-bordered table-sm align-middle" id="tablaPerfiles">
+        <thead>
+          <tr>
+            <th>Perfil</th>
+            <th>Matriz</th>
+            <th>Precio</th>
+            <th>Cantidad</th>
+            <th>Subtotal</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <hr class="my-4">
+
+    <div class="row g-3 align-items-end">
+      <div class="col-md-6 suggestions">
+        <label class="form-label">Agregar análisis</label>
+        <input type="text" id="buscarAnalisis" class="form-control" placeholder="Buscar por Ensayo, Nombre o Empresa">
+        <div id="sugerencias" class="suggestions-list d-none"></div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Cantidad</label>
+        <input type="number" id="cantidadAnalisis" class="form-control" min="1" value="1">
+      </div>
+      <div class="col-md-3">
+        <button type="button" id="btnAgregarAnalisis" class="btn btn-primary w-100">Agregar</button>
+      </div>
+    </div>
+
+    <div class="table-responsive mt-3">
+      <table class="table table-bordered table-sm align-middle" id="tablaItems">
+        <thead>
+          <tr>
+            <th>Ensayo</th>
+            <th>Nombre</th>
+            <th>Matriz</th>
+            <th>Empresa</th>
+            <th>Precio base (S/)</th>
+            <th>Cantidad</th>
+            <th>Subtotal</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="text-end">
+      <div><strong>Subtotal análisis: </strong><span id="subtotalAnalisis">0.00</span></div>
+      <div><strong>Subtotal perfiles: </strong><span id="subtotalPerfiles">0.00</span></div>
+      <div><strong>Subtotal general: </strong><span id="subtotal">0.00</span></div>
+      <div><strong>Descuento aplicado: </strong><span id="descuentoAplicado">0.00</span></div>
+      <div class="fs-5"><strong>Total: </strong><span id="total">0.00</span></div>
+    </div>
+
+    <input type="hidden" name="items" id="itemsHidden">
+    <input type="hidden" name="perfiles" id="perfilesHidden">
+    <div class="text-end mt-3">
+      <a href="/cotizaciones" class="btn btn-secondary">Cancelar</a>
+      <button class="btn btn-success">Crear Cotización</button>
+    </div>
+  </form>
+
+  <%- include('./partials/scripts') %>
+  <script>
+    const MATRICES = <%- JSON.stringify(matrices || []) %>;
+    const PERFILES = <%- JSON.stringify(perfiles || []) %>;
+    const buscar = document.getElementById('buscarAnalisis');
+    const sugerencias = document.getElementById('sugerencias');
+    const cantidadInput = document.getElementById('cantidadAnalisis');
+    const tablaBody = document.querySelector('#tablaItems tbody');
+    const tablaPerfilesBody = document.querySelector('#tablaPerfiles tbody');
+    const itemsHidden = document.getElementById('itemsHidden');
+    const perfilesHidden = document.getElementById('perfilesHidden');
+    const descuentoInput = document.getElementById('Descuento');
+    const subtotalAnalisisSpan = document.getElementById('subtotalAnalisis');
+    const subtotalPerfilesSpan = document.getElementById('subtotalPerfiles');
+    const subtotalGeneralSpan = document.getElementById('subtotal');
+    const perfilSelect = document.getElementById('perfilSelect');
+    const perfilMatrizSelect = document.getElementById('perfilMatriz');
+    const perfilPrecioInput = document.getElementById('perfilPrecio');
+    const perfilCantidadInput = document.getElementById('perfilCantidad');
+    const btnAgregarPerfil = document.getElementById('btnAgregarPerfil');
+    const monedaSelect = document.getElementById('Moneda');
+    const tipoCambioInput = document.getElementById('TipoCambio');
+    const currencySymbols = { PEN: 'S/', USD: 'US$', EUR: '€' };
+    const matricesCache = new Map();
+
+    const getCurrencyCode = () => (monedaSelect && monedaSelect.value ? monedaSelect.value : 'PEN').toUpperCase();
+    const getCurrencySymbol = () => currencySymbols[getCurrencyCode()] || getCurrencyCode();
+    const getCurrencyFactor = () => {
+      const code = getCurrencyCode();
+      if (code === 'PEN') return 1;
+      const rate = Number(tipoCambioInput && tipoCambioInput.value ? tipoCambioInput.value : 0);
+      return rate > 0 ? (1 / rate) : 1;
+    };
+    const fmtBase = (n) => (Number(n||0)).toFixed(2);
+    const fmtCurrency = (n) => (Number(n||0) * getCurrencyFactor()).toFixed(2);
+
+    function syncTipoCambioInput(){
+      if (!tipoCambioInput || !monedaSelect) return;
+      if (getCurrencyCode() === 'PEN') {
+        tipoCambioInput.value = '1.0000';
+        tipoCambioInput.setAttribute('disabled', 'disabled');
+      } else {
+        tipoCambioInput.removeAttribute('disabled');
+        if (!(Number(tipoCambioInput.value) > 0)) tipoCambioInput.value = '';
+      }
+      renderItems();
+      renderPerfiles();
+      recalc();
+    }
+    if (monedaSelect) monedaSelect.addEventListener('change', syncTipoCambioInput);
+    if (tipoCambioInput) tipoCambioInput.addEventListener('input', () => {
+      if (getCurrencyCode() !== 'PEN') {
+        renderItems();
+        renderPerfiles();
+        recalc();
+      }
+    });
+    // Set default date to today (local)
+    (function setDefaultDate(){
+      const fechaInput = document.querySelector('input[name="Fecha"]');
+      if (fechaInput && !fechaInput.value) {
+        const now = new Date();
+        const tzoffset = now.getTimezoneOffset() * 60000; // minutes to ms
+        fechaInput.value = new Date(Date.now() - tzoffset).toISOString().slice(0,10);
+      }
+    })();
+    let cache = [];
+    let items = [];
+    let perfilesSeleccionados = [];
+    syncTipoCambioInput();
+
+    // Pre-cargar items si vienen por ?ensayos=E1,E2
+    (function preloadFromQuery(){
+      const params = new URLSearchParams(window.location.search);
+      const ens = params.get('ensayos');
+      if (!ens) return;
+      fetch('/cotizaciones/api/analisis/by-ids?ensayos=' + encodeURIComponent(ens))
+        .then(r=>r.json()).then(r=>{
+          if (!r.ok) return;
+          const incoming = r.data || [];
+          incoming.forEach(x => {
+            if (items.find(it => it.Ensayo === x.Ensayo)) return; // evitar duplicados
+            items.push({
+              Ensayo: x.Ensayo,
+              Nombre: x.Nombre || '',
+              Empresa: x.Empresa || null,
+              Precio: Number(x.Precio || 0),
+              Cantidad: 1,
+              Observaciones: ''
+            });
+            ensureMatricesForItem(items[items.length - 1]);
+          });
+          renderItems();
+        }).catch(()=>{});
+    })();
+
+    function renderSuggestions(list){
+      if (!list || !list.length){ sugerencias.classList.add('d-none'); sugerencias.innerHTML=''; return; }
+      sugerencias.classList.remove('d-none');
+      sugerencias.innerHTML = list.map(x=>`<div class="item" data-analisisid="${x.AnalisisId||''}" data-ensayo="${x.Ensayo}" data-nombre="${x.Nombre||''}" data-empresa="${x.Empresa||''}" data-precio="${x.Precio||0}">
+        <div><strong>${x.Ensayo}</strong> - ${x.Nombre||''}</div>
+        <small class="text-muted">${x.Empresa||'-'} | ${getCurrencySymbol()} ${fmtCurrency(x.Precio||0)}</small>
+      </div>`).join('');
+    }
+
+    function search(q){
+      fetch(`/cotizaciones/api/analisis?q=${encodeURIComponent(q)}`)
+        .then(r=>r.json()).then(r=>{ if(r.ok){ cache = r.data; renderSuggestions(cache); } else { renderSuggestions([]); } })
+        .catch(()=>renderSuggestions([]));
+    }
+
+    function subtotalInternoAnalisis(){
+      return items
+        .filter(it => (it.Empresa || '').toString().trim().toLowerCase() === 'interno')
+        .reduce((a, x) => a + Number(x.Precio || 0) * Number(x.Cantidad || 1), 0);
+    }
+
+    function recalc(){
+      const subtotalAnalisis = items.reduce((a,x)=>a + Number(x.Precio||0)*Number(x.Cantidad||1), 0);
+      const subtotalPerfiles = perfilesSeleccionados.reduce((a,p)=>a + Number(p.Precio||0)*Number(p.Cantidad||1), 0);
+      const subtotal = subtotalAnalisis + subtotalPerfiles;
+      const descPct = Number(descuentoInput.value || 0) / 100;
+      const descuento = subtotalInternoAnalisis() * descPct;
+      const total = subtotal - descuento;
+      const symbol = getCurrencySymbol();
+      subtotalAnalisisSpan.textContent = `${symbol} ${fmtCurrency(subtotalAnalisis)}`;
+      subtotalPerfilesSpan.textContent = `${symbol} ${fmtCurrency(subtotalPerfiles)}`;
+      subtotalGeneralSpan.textContent = `${symbol} ${fmtCurrency(subtotal)}`;
+      document.getElementById('descuentoAplicado').textContent = `${symbol} ${fmtCurrency(descuento)}`;
+      document.getElementById('total').textContent = `${symbol} ${fmtCurrency(total)}`;
+      itemsHidden.value = JSON.stringify(items);
+      perfilesHidden.value = JSON.stringify(perfilesSeleccionados);
+    }
+
+    // Cargar contactos cuando cambie el cliente
+    const clienteSelect = document.getElementById('ClienteId');
+    const contactoSelect = document.getElementById('ContactoId');
+    clienteSelect.addEventListener('change', () => {
+      const codigo = (clienteSelect.value || '').trim();
+      contactoSelect.innerHTML = '<option value="" selected>Cargando...</option>';
+      fetch('/cotizaciones/api/clientes/' + encodeURIComponent(codigo) + '/contactos')
+        .then(r=>r.json()).then(r=>{
+          const list = r.data || [];
+          contactoSelect.innerHTML = '<option value="" selected>Seleccione un contacto</option>' +
+            list.map(c=>`<option value="${c.Codigo}">${c.Nombre}${c.Puesto?(' - '+c.Puesto):''}</option>`).join('');
+        }).catch(()=>{
+          contactoSelect.innerHTML = '<option value="" selected>Seleccione un contacto</option>';
+        });
+    });
+
+    function fetchMatricesByEnsayo(ensayo){
+      if (!ensayo) return Promise.resolve([]);
+      if (matricesCache.has(ensayo)) return matricesCache.get(ensayo);
+      const promise = fetch(`/cotizaciones/api/matrices?ensayo=${encodeURIComponent(ensayo)}`)
+        .then(r=>r.json())
+        .then(r=> r.ok ? (r.data || []) : [])
+        .catch(()=>[]);
+      matricesCache.set(ensayo, promise);
+      return promise;
+    }
+
+    function ensureMatricesForItem(item){
+      if (!item || !item.Ensayo || item.MatricesLoading || item.MatricesFetched) return;
+      item.MatricesLoading = true;
+      fetchMatricesByEnsayo(item.Ensayo).then(list => {
+        item.Matrices = Array.isArray(list) ? list : [];
+        item.MatricesFetched = true;
+        item.MatricesLoading = false;
+        renderItems();
+      }).catch(()=>{ item.MatricesLoading = false; });
+    }
+
+    function optMatriz(list, selected){
+      const data = (Array.isArray(list) && list.length ? list : MATRICES) || [];
+      const normalizedSelected = String(selected || '');
+      const hasSelected = data.some(m => String(m.MatrizId) === normalizedSelected);
+      const finalData = (!hasSelected && normalizedSelected)
+        ? data.concat([{ MatrizId: normalizedSelected, Nombre: `#${normalizedSelected}` }])
+        : data;
+      return '<option value="">Seleccione...</option>' + finalData.map(m=>`<option value="${m.MatrizId}" ${normalizedSelected===String(m.MatrizId)?'selected':''}>${m.Nombre}</option>`).join('');
+    }
+
+    function matricesForItem(item){
+      if (item && Array.isArray(item.Matrices) && item.Matrices.length) return item.Matrices;
+      return MATRICES;
+    }
+
+    function renderItems(){
+      items.forEach(it => ensureMatricesForItem(it));
+      const symbol = getCurrencySymbol();
+      tablaBody.innerHTML = items.map((x,idx)=>`
+        <tr>
+          <td>${x.Ensayo}</td>
+          <td>${x.Nombre||''}</td>
+          <td><select class="form-select form-select-sm matriz" data-idx="${idx}">${optMatriz(matricesForItem(x), x.MatrizId||'')}</select></td>
+          <td>${x.Empresa||'-'}</td>
+          <td><input type="number" class="form-control form-control-sm precio" data-idx="${idx}" value="${x.Precio||0}" step="0.01"></td>
+          <td><input type="number" class="form-control form-control-sm cantidad" data-idx="${idx}" value="${x.Cantidad||1}" min="1"></td>
+          <td>${symbol} ${fmtCurrency((x.Precio||0)*(x.Cantidad||1))}</td>
+          <td><button type="button" class="btn btn-sm btn-outline-danger quitar" data-idx="${idx}">Quitar</button></td>
+        </tr>
+      `).join('');
+      recalc();
+    }
+    function renderPerfiles(){
+      if (!tablaPerfilesBody) return;
+      const symbol = getCurrencySymbol();
+      tablaPerfilesBody.innerHTML = perfilesSeleccionados.map((p,idx)=>`
+        <tr>
+          <td>${p.Nombre || p.PerfilId}</td>
+          <td><select class="form-select form-select-sm perfil-matriz" data-idx="${idx}">${optMatriz(MATRICES, p.MatrizId || '')}</select></td>
+          <td><input type="number" class="form-control form-control-sm perfil-precio" data-idx="${idx}" value="${Number(p.Precio||0)}" step="0.01"></td>
+          <td><input type="number" class="form-control form-control-sm perfil-cantidad" data-idx="${idx}" value="${Number(p.Cantidad||1)}" min="1"></td>
+          <td>${symbol} ${fmtCurrency(Number(p.Precio||0)*Number(p.Cantidad||1))}</td>
+          <td><button type="button" class="btn btn-sm btn-outline-danger quitar-perfil" data-idx="${idx}">Quitar</button></td>
+        </tr>
+      `).join('');
+      recalc();
+    }
+
+    buscar.addEventListener('input', (e)=>{
+      const q = e.target.value.trim();
+      if (q.length < 2){ sugerencias.classList.add('d-none'); sugerencias.innerHTML=''; return; }
+      search(q);
+    });
+
+    sugerencias.addEventListener('click', (e)=>{
+      const el = e.target.closest('.item');
+      if (!el) return;
+      const item = {
+        AnalisisId: el.dataset.analisisid || '',
+        Ensayo: el.dataset.ensayo,
+        Nombre: el.dataset.nombre || '',
+        Empresa: el.dataset.empresa || null,
+        MatrizId: '',
+        Precio: Number(el.dataset.precio||0),
+        Cantidad: Number(cantidadInput.value || 1),
+        Observaciones: ''
+      };
+      items.push(item);
+      ensureMatricesForItem(item);
+      buscar.value=''; cantidadInput.value = 1; sugerencias.classList.add('d-none'); sugerencias.innerHTML='';
+      renderItems();
+    });
+
+    document.getElementById('btnAgregarAnalisis').addEventListener('click', ()=>{
+      if (!cache.length) return;
+      const x = cache[0];
+      const item = {
+        AnalisisId: x.AnalisisId || '',
+        Ensayo: x.Ensayo,
+        Nombre: x.Nombre || '',
+        Empresa: x.Empresa || null,
+        MatrizId: '',
+        Precio: Number(x.Precio||0),
+        Cantidad: Number(cantidadInput.value || 1),
+        Observaciones: ''
+      };
+      items.push(item);
+      ensureMatricesForItem(item);
+      buscar.value=''; cantidadInput.value = 1; sugerencias.classList.add('d-none'); sugerencias.innerHTML='';
+      renderItems();
+    });
+
+    tablaBody.addEventListener('input', (e)=>{
+      const precio = e.target.classList.contains('precio');
+      const cantidad = e.target.classList.contains('cantidad');
+      if (!precio && !cantidad) return;
+      const idx = Number(e.target.dataset.idx);
+      if (precio) items[idx].Precio = Number(e.target.value || 0);
+      if (cantidad) items[idx].Cantidad = Number(e.target.value || 1);
+      renderItems();
+    });
+
+    tablaBody.addEventListener('change', (e)=>{
+      if (e.target.classList.contains('matriz')){
+        const idx = Number(e.target.dataset.idx);
+        items[idx].MatrizId = e.target.value || '';
+        recalc();
+      }
+    });
+
+    tablaBody.addEventListener('click', (e)=>{
+      if (!e.target.classList.contains('quitar')) return;
+      const idx = Number(e.target.dataset.idx);
+      items.splice(idx,1);
+      renderItems();
+    });
+
+    descuentoInput.addEventListener('input', recalc);
+
+    function cargarPrecioPerfilActual() {
+      if (!perfilSelect || !perfilPrecioInput) return;
+      const val = perfilSelect.value;
+      if (!val) {
+        perfilPrecioInput.value = '';
+        return;
+      }
+      let precioValor = null;
+      const selectedOpt = perfilSelect.options[perfilSelect.selectedIndex];
+      if (selectedOpt) {
+        if (selectedOpt.dataset && typeof selectedOpt.dataset.precio !== 'undefined') {
+          const attrVal = selectedOpt.dataset.precio;
+          if (attrVal !== '') precioValor = attrVal;
+        } else {
+          const attrVal = selectedOpt.getAttribute('data-precio');
+          if (attrVal !== null && attrVal !== '') precioValor = attrVal;
+        }
+      }
+      if (precioValor == null || precioValor === '') {
+        const pf = (PERFILES||[]).find(p => String(p.PerfilId) === String(val));
+        if (pf && pf.PrecioBase != null) {
+          precioValor = Number(pf.PrecioBase).toFixed(2);
+        }
+      }
+      perfilPrecioInput.value = precioValor || '';
+    }
+
+    if (perfilSelect) {
+      perfilSelect.addEventListener('change', cargarPrecioPerfilActual);
+      cargarPrecioPerfilActual();
+    }
+
+    if (btnAgregarPerfil) {
+      btnAgregarPerfil.addEventListener('click', ()=>{
+        if (!perfilSelect) return;
+        const id = (perfilSelect.value || '').trim();
+        if (!id) return;
+        const catalog = (PERFILES||[]).find(p => String(p.PerfilId) === String(id));
+        const nombre = catalog ? (catalog.Nombre || catalog.PerfilId) : id;
+        let precio = Number(perfilPrecioInput && perfilPrecioInput.value ? perfilPrecioInput.value : (catalog && catalog.PrecioBase != null ? catalog.PrecioBase : 0));
+        if (!Number.isFinite(precio)) precio = 0;
+        let cantidad = Number(perfilCantidadInput && perfilCantidadInput.value ? perfilCantidadInput.value : 1);
+        if (!Number.isFinite(cantidad) || cantidad <= 0) cantidad = 1;
+        const existing = perfilesSeleccionados.find(p => p.PerfilId === id);
+        const matrizId = perfilMatrizSelect ? (perfilMatrizSelect.value || '') : '';
+        if (existing) {
+          existing.Cantidad += cantidad;
+          existing.Precio = precio;
+          existing.MatrizId = matrizId;
+        } else {
+          perfilesSeleccionados.push({ PerfilId: id, Nombre: nombre, Precio: precio, Cantidad: cantidad, MatrizId: matrizId });
+        }
+        if (perfilCantidadInput) perfilCantidadInput.value = 1;
+        if (perfilSelect) perfilSelect.value = '';
+        if (perfilPrecioInput) perfilPrecioInput.value = '';
+        if (perfilMatrizSelect) perfilMatrizSelect.value = '';
+        renderPerfiles();
+      });
+    }
+
+    if (tablaPerfilesBody) {
+      tablaPerfilesBody.addEventListener('input', e => {
+        const idx = Number(e.target.dataset.idx);
+        if (Number.isNaN(idx)) return;
+        if (e.target.classList.contains('perfil-precio')) {
+          perfilesSeleccionados[idx].Precio = Number(e.target.value || 0);
+        }
+        if (e.target.classList.contains('perfil-cantidad')) {
+          const val = Number(e.target.value || 1);
+          perfilesSeleccionados[idx].Cantidad = val > 0 ? val : 1;
+        }
+        renderPerfiles();
+      });
+      tablaPerfilesBody.addEventListener('click', e => {
+        if (!e.target.classList.contains('quitar-perfil')) return;
+        const idx = Number(e.target.dataset.idx);
+        if (Number.isNaN(idx)) return;
+        perfilesSeleccionados.splice(idx,1);
+        renderPerfiles();
+      });
+      tablaPerfilesBody.addEventListener('change', e => {
+        if (!e.target.classList.contains('perfil-matriz')) return;
+        const idx = Number(e.target.dataset.idx);
+        if (Number.isNaN(idx)) return;
+        perfilesSeleccionados[idx].MatrizId = e.target.value || '';
+        renderPerfiles();
+      });
+    }
+    recalc();
+  </script>
+  <%- include('./partials/footer') %>
+</body>
+</html>

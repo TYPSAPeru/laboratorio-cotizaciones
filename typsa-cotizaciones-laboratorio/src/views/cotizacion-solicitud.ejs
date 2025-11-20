@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solicitud de Servicios #<%= header.CotizacionId %></title>
+  <style>
+    @page { margin: 20mm 15mm 20mm 15mm; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #222; margin: 0; padding: 0; }
+    .content { padding: 0 15px 20px 15px; }
+    .header { display:flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .brand { display:flex; align-items:center; gap:10px; }
+    .brand img { height: 42px; }
+    .meta { text-align: right; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; }
+    thead th { background:#f5f5f5; }
+    .section { margin: 14px 0; }
+    footer { font-size:11px; color:#444; text-align:right; margin-top:32px; padding: 0 15px; }
+    @media print {
+      .no-print { display:none; }
+      .content { padding-bottom: 50px; }
+      footer { position: fixed; bottom: 5mm; right: 15mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="text-align:right; margin-bottom:8px;">
+    <button onclick="window.print()">Imprimir / Guardar PDF</button>
+  </div>
+
+  <div class="content">
+  <div class="header">
+    <div class="brand">
+      <img src="/img/typsa.png" alt="TYPSA">
+      <div>
+        <div style="font-weight:700;">TYPSA</div>
+        <div style="font-size:11px;">Solicitud de Servicios</div>
+      </div>
+    </div>
+    <div class="meta">
+      <div><strong>Solicitud:</strong> #<%= header.CotizacionId %></div>
+      <div><strong>Fecha:</strong> <%= header.Fecha && header.Fecha.toISOString ? header.Fecha.toISOString().split('T')[0] : (header.Fecha || '') %></div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:12px;">
+    <strong>Cliente:</strong> <%= clienteNombre  %><br>
+    <strong>RUC:</strong> <%= clienteRuc || '-' %> &nbsp; &nbsp; <strong>Código:</strong> <%= clienteCodigo || '-' %><br>
+    <strong>Dirección:</strong> <%= clienteDireccion || '-' %><br>
+    <strong>Dirigido a:</strong> <%= contactoNombre || '-' %> &nbsp; &nbsp; <strong>Atención:</strong> <%= header.EmpleadoNombre || header.EmpleadoId %>
+  </div>
+  <div style="margin-bottom:12px;">
+    <strong>Moneda:</strong> <%= (currency && currency.label) || 'Soles (PEN)' %>
+    <% if (currency && currency.code !== 'PEN') { %>
+      &nbsp; &nbsp; <strong>Tipo de cambio:</strong> <%= (currency.tipoCambio || 1).toFixed(4) %>
+    <% } %>
+  </div>
+
+  <div class="section">
+    <% 
+      const groups = {};
+      const pushRow = (key, row) => {
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(row);
+      };
+      (items||[]).forEach(it => {
+        const key = it.MatrizNombre || 'Sin matriz';
+        pushRow(key, {
+          tipo: 'analisis',
+          Codigo: it.Ensayo || it.AnalisisId || '',
+          Nombre: it.Nombre || '',
+          Acreditador: it.Acreditador || '-',
+          Empresa: it.Empresa || '-',
+          LDD: it.LDD || '',
+          LDC: it.LDC || '',
+          Cantidad: Number(it.Cantidad || 0)
+        });
+      });
+      (perfiles||[]).forEach(p => {
+        const key = p.MatrizNombre || 'Sin matriz';
+        pushRow(key, {
+          tipo: 'perfil',
+          Codigo: p.PerfilId ? `P-${p.PerfilId}` : 'P',
+          Nombre: p.Nombre || p.PerfilId || '',
+          Acreditador: '-',
+          Empresa: 'Perfil',
+          LDD: '',
+          LDC: '',
+          Cantidad: Number(p.Cantidad || 0)
+        });
+      });
+      const groupNames = Object.keys(groups).sort((a,b)=>a.localeCompare(b));
+    %>
+
+    <% groupNames.forEach((gName, gi) => { const rows = groups[gName] || []; %>
+      <div style="margin: 14px 0; <%= gi>0 ? 'page-break-inside: avoid;' : '' %>">
+        <div style="font-weight:600; margin: 6px 0;">Servicio de monitoreo y analisis de <%= gName %></div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:15%">Codigo</th>
+              <th style="width:25%">Analisis</th>
+              <th style="width:18%">Acreditador</th>
+              <th>Empresa</th>
+              <th style="width:12%">LDD</th>
+              <th style="width:12%">LDC</th>
+              <th style="width:10%">Cant.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(it => { %>
+              <tr>
+                <td><%= it.Codigo || (it.tipo === 'perfil' ? 'P' : '') %></td>
+                <td><%= it.Nombre || '' %><% if (it.tipo === 'perfil') { %> (Perfil)<% } %></td>
+                <td><%= it.Acreditador || '-' %></td>
+                <td><%= it.Empresa || '-' %></td>
+                <td><%= it.LDD || '' %></td>
+                <td><%= it.LDC || '' %></td>
+                <td style="text-align:center;"><%= it.Cantidad %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% }) %>
+  </div>
+
+  <% if ((extras||[]).length) { %>
+    <div class="section">
+      <div style="font-weight:600; margin: 6px 0;">Gastos del servicio (sin precios)</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:30%">Concepto</th>
+            <th>Descripción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% extras.forEach(e => { %>
+            <tr>
+              <td><%= e.key %></td>
+              <td style="white-space:pre-line"><%= (e.desc||'') %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  </div>
+
+  <footer>
+    G0801-2
+  </footer>
+</body>
+</html>
+
