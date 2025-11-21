@@ -1,8 +1,3 @@
 {
-	"cotizaciones": "LAB_COTIZACIONES",
-	"analisis": "LAB_ANALISIS",
-	"matrices": "LAB_MATRICES",
-	"perfiles": "LAB_PERFILES",
-	"solicitador": "SOLICITADOR",
-	"aprobador": "APROBADOR"
+	"cotizador": "COTIZADOR_LABORATORIO"
 }
