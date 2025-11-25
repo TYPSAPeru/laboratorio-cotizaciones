@@ -35,6 +35,7 @@ app.use(async function (req, res, next) {
     };
   };
 
+  // Dev bypass
   if (process.env.NODE_ENV === 'development') {
     const granted = Object.values(process.permisos || {});
     const logged = {
@@ -56,9 +57,20 @@ app.use(async function (req, res, next) {
     return next();
   }
 
-  let UUID = process.env.UUID || (req.cookies ? req.cookies.UUID : null);
+  // UUID: cookie (case-insensitive) -> header/query (para pruebas) -> .env
+  const getUuidFromReq = (req) => {
+    const cookies = req.cookies || {};
+    const foundKey = Object.keys(cookies).find((k) => k.toUpperCase() === 'UUID');
+    if (foundKey) return cookies[foundKey];
+    const cookieHeader = req.headers && req.headers.cookie ? req.headers.cookie : '';
+    const match = cookieHeader.match(/(?:^|;)\s*UUID=([^;]+)/i);
+    if (match) return decodeURIComponent(match[1]);
+    return req.get('x-uuid') || req.query.UUID || null;
+  };
+  let UUID = getUuidFromReq(req) || process.env.UUID || null;
   if (!UUID) return res.redirect(LOGIN_URL);
 
+  // Sesión
   const sesiones = await SQL.Query(
     'main',
     `
@@ -75,9 +87,7 @@ app.use(async function (req, res, next) {
   }
   if (!Array.isArray(sesiones) || !sesiones.length) return res.redirect(LOGIN_URL);
   const sesion = sesiones[0];
-  if (sesion.Expiracion && Date.now() > new Date(sesion.Expiracion).getTime()) {
-    // Expiración ignorada intencionalmente a pedido.
-  }
+  // Expiración ignorada intencionalmente según solicitud previa
 
   const logged = {
     UUID,
@@ -87,6 +97,24 @@ app.use(async function (req, res, next) {
     PermisoIds: [],
   };
 
+  // Nombre de empleado desde tabla Empleados
+  try {
+    const empRows = await SQL.Query(
+      'main',
+      `
+        SELECT TOP 1 EmpleadoId,
+               Nombre = LTRIM(RTRIM(COALESCE(Nombres,'') + ' ' + COALESCE(Apellidos,'')))
+        FROM dbo.Empleados
+        WHERE EmpleadoId = @EmpleadoId
+      `,
+      { EmpleadoId: logged.EmpleadoId }
+    );
+    if (Array.isArray(empRows) && empRows.length && empRows[0].Nombre) {
+      logged.Nombre = empRows[0].Nombre;
+    }
+  } catch (_) {}
+
+  // Permisos
   const permisosRows = await SQL.Query(
     'main',
     `
@@ -104,9 +132,7 @@ app.use(async function (req, res, next) {
   const nombres = new Set();
   const ids = new Set();
   (permisosRows || []).forEach((row) => {
-    if (row.PermisoId !== null && typeof row.PermisoId !== 'undefined') {
-      ids.add(row.PermisoId);
-    }
+    if (row.PermisoId !== null && typeof row.PermisoId !== 'undefined') ids.add(row.PermisoId);
     const nombre = normalizePerm(row.Nombre || row.PermisoId || '');
     if (nombre) nombres.add(nombre);
   });

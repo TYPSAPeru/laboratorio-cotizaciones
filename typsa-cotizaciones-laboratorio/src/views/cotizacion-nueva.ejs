@@ -69,14 +69,10 @@
     <div class="row g-3 mt-1">
       <div class="col-md-6">
         <label class="form-label">Empleado</label>
-        <select name="EmpleadoId" class="form-select" required>
-          <option value="" disabled selected>Seleccione un empleado</option>
-          <% (empleados || []).forEach(e => { %>
-            <option value="<%= e.EmpleadoId %>"><%= e.Nombre %></option>
-          <% }) %>
-        </select>
-        <% if (!empleados || empleados.length === 0) { %>
-          <div class="form-text text-warning">No hay empleados disponibles.</div>
+        <input type="text" class="form-control" value="<%= (logged && logged.Nombre) ? logged.Nombre : '' %>" disabled>
+        <input type="hidden" name="EmpleadoId" value="<%= (logged && logged.EmpleadoId) ? logged.EmpleadoId : '' %>">
+        <% if (!logged || !logged.EmpleadoId) { %>
+          <div class="form-text text-warning">No se encontró el empleado en la sesión.</div>
         <% } %>
       </div>
     </div>

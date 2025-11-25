@@ -236,14 +236,6 @@ router.get('/nueva', async (req, res) => {
       : [];
   } catch (e) { error = e.message; }
 
-  try {
-    const rEmpleados = await SQL.Query(
-      'main',
-      "SELECT EmpleadoId, Nombre = LTRIM(RTRIM(COALESCE(Nombres,'') + ' ' + COALESCE(Apellidos,''))) FROM dbo.Empleados WHERE DepartamentoId IN (16,17,18,19,20)"
-    );
-    empleados = Array.isArray(rEmpleados) ? rEmpleados : [];
-  } catch (e) { error = e.message; }
-
   // Matrices para selección (solo lectura)
   try {
     const rMatrices = await SQL.Query('read', `
@@ -895,8 +887,13 @@ router.get('/:id/solicitud', async (req, res) => {
 // Crear cotizaciÃ³n con mÃºltiples anÃ¡lisis
 router.post('/crear', async (req, res) => {
   try {
-    const { Fecha, Descripcion, EmpleadoId, Descuento = 0 } = req.body;
+    const { Fecha, Descripcion, Descuento = 0 } = req.body;
     let { ClienteId, ContactoId } = req.body;
+    const EmpleadoId = req.logged && req.logged.EmpleadoId ? req.logged.EmpleadoId : null;
+    if (!EmpleadoId) {
+      return res.status(400).send('Empleado no encontrado en la sesión');
+    }
+
     // Extras
     const Personal = (req.body.Personal || '').toString();
     const Operativos = (req.body.Operativos || '').toString();
