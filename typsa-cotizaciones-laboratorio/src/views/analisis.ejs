@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <%- include('./partials/meta', { titulo: 'TYPSA Perú - Análisis Combinados' }) %>
+  <%- include('./partials/meta', { titulo: 'TYPSA Perú - Análisis de Laboratorio' }) %>
 </head>
 <body>
   <%- include('./partials/navbar', { page: '/analisis', logged }) %>
   <div class="container mt-5">
-  <h1>📋 Análisis de Laboratorio</h1>
+  <h1>Análisis de Laboratorio</h1>
   <p class="text-muted">Internos (solo lectura) y Externos (editables)</p>
   <div class="mb-3 mt-3">
     <input
@@ -30,14 +30,14 @@
         <th>Ensayo</th>
         <th>Nombre</th>
         <th>Sección</th>
-        <th>Técnica</th>
+        <th>Método</th>
         <th>Empresa</th>
         <th>Precio</th>
         <th>Acciones</th>
       </tr>
     </thead>
     <tbody id="analisisTableBody">
-      <% analisis.forEach(a => { %>
+      <% (analisis || []).forEach(a => { %>
         <tr>
           <td>
             <input type="checkbox" class="form-check-input sel-analisis"
@@ -47,7 +47,7 @@
           <td><%= a.Ensayo %></td>
           <td><%= a.Nombre %></td>
           <td><%= a.Seccion %></td>
-          <td><%= a.Tecnica %></td>
+          <td><%= a.Metodo || a.Tecnica || '-' %></td>
           <td><%= a.Empresa || '-' %></td>
           <td><%= a.Precio || '-' %></td>
           <td>
@@ -142,5 +142,3 @@
   </div>
 </body>
 </html>
-
-

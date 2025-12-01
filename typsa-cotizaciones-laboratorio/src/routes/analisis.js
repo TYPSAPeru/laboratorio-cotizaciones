@@ -1,35 +1,47 @@
-
 const express = require('express');
 const router = express.Router();
-const { Query, Execute } = require('../modules/database');
-
+const { Query } = require('../modules/database');
 
 router.get('/', async (req, res) => {
   let acreditadores = [];
   try {
     const listaAcreditadores = await Query('main', 'SELECT AcreditadorId, Nombre FROM laboratorio.Acreditadores ORDER BY Nombre');
     acreditadores = Array.isArray(listaAcreditadores) ? listaAcreditadores : [];
-    // 🔹 Datos base desde LABO_COTI (solo lectura)
+
+    // Datos base desde lectura (MES_ensayos)
     const ensayos = await Query('read', `
       SELECT 
         Ensayo,
         Nombre,
         Seccion,
         Tecnica,
+        PNT,
         Limite_Deteccion,
         Limite_Cuantificacion
       FROM dbo.MES_ensayos
     `);
 
-    // 🔹 Datos complementarios desde TESTING_STEFANO (principal)
-    const complementos = await Query('main', 'SELECT * FROM laboratorio.AnalisisLaboratorio');
+    // Catalogo de procedimientos para obtener el método
+    const procedimientos = await Query('read', `
+      SELECT RTRIM(LTRIM(Procedimiento)) AS Procedimiento, Descripcion
+      FROM dbo.LMS_Procedimientos
+    `);
+    const procMap = new Map(
+      (Array.isArray(procedimientos) ? procedimientos : []).map(p => [ (p.Procedimiento || '').toString().trim(), p.Descripcion || '' ])
+    );
 
-    // 🔹 Unir ambos conjuntos
+    // Complementos desde la BD principal
+    const complementos = await Query('main', 'SELECT * FROM laboratorio.AnalisisLaboratorio');
+    const listaComplementos = Array.isArray(complementos) ? complementos : [];
+
+    // Unir ambos conjuntos
     const analisis = (ensayos || []).map(e => {
-      const listaComplementos = Array.isArray(complementos) ? complementos : [];
       const comp = listaComplementos.find(c => c.Nombre === e.Nombre);
+      const pntCode = (e.PNT || '').toString().trim();
+      const metodo = procMap.get(pntCode) || e.Tecnica || '';
       return {
         ...e,
+        Metodo: metodo,
         AnalisisId: comp ? comp.AnalisisId : null,
         EsExterno: comp ? comp.EsExterno : 0,
         Empresa: comp ? (comp.Subcontratado ? 'Subcontratado' : 'Interno') : 'Interno',

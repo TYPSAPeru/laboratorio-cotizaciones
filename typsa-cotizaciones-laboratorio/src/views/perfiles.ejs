@@ -11,6 +11,10 @@
       <div class="alert alert-warning">No se pudo cargar algunos datos: <%= error %></div>
     <% } %>
 
+    <div class="mb-3">
+      <input type="text" id="searchPerfiles" class="form-control" placeholder="Buscar por ID, nombre o descripcion...">
+    </div>
+
     <div class="table-responsive">
       <table class="table table-striped align-middle">
         <thead>
@@ -86,8 +90,20 @@
     });
   </script>
 
+  <script>
+    // Busqueda en vivo (insensible a acentos)
+    const searchInput = document.getElementById('searchPerfiles');
+    const norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    searchInput.addEventListener('input', () => {
+      const q = norm(searchInput.value);
+      document.querySelectorAll('table tbody tr').forEach(tr => {
+        const txt = norm(tr.textContent);
+        tr.style.display = txt.includes(q) ? '' : 'none';
+      });
+    });
+  </script>
+
   <%- include('./partials/scripts') %>
   <%- include('./partials/footer') %>
 </body>
 </html>
-
