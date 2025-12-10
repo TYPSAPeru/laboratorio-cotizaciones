@@ -40,6 +40,47 @@ const buildCurrencyInfo = (codeRaw, tipoCambioRaw) => {
   };
 };
 const unique = (arr = []) => Array.from(new Set(arr));
+const loadMatrizNames = async (items = [], perfiles = []) => {
+  const all = [...(items || []), ...(perfiles || [])];
+  const ids = Array.from(new Set(all.map(x => String(x.MatrizId ?? '').trim()).filter(Boolean)));
+  if (!ids.length) return { items, perfiles };
+  const pm = {};
+  const inMs = ids.map((v, i) => { pm['m' + i] = v; return '@m' + i; }).join(',');
+  let mats = await SQL.Query('read', `
+    SELECT Material AS MatrizId, Descripcion AS Nombre
+    FROM dbo.MES_Materiales
+    WHERE LTRIM(RTRIM(CAST(Material AS NVARCHAR(50)))) IN (${inMs})
+  `, pm);
+  if (!Array.isArray(mats) || !mats.length) {
+    mats = await SQL.Query('read', `
+      SELECT Material AS MatrizId, Descripcion AS Nombre
+      FROM dbo.MES_Materiales
+    `);
+  }
+  const byMid = new Map();
+  (Array.isArray(mats) ? mats : []).forEach(r => {
+    const raw = String(r.MatrizId ?? '').trim();
+    const name = r.Nombre;
+    const noZero = raw.replace(/^0+/, '');
+    const padLen = Math.max(raw.length, 6);
+    const pad = noZero.padStart(padLen, '0');
+    byMid.set(raw, name);
+    if (noZero) byMid.set(noZero, name);
+    if (pad) byMid.set(pad, name);
+  });
+  const mapMatriz = obj => {
+    const midRaw = String(obj.MatrizId ?? '').trim();
+    const midNoZero = midRaw.replace(/^0+/, '');
+    const padLen = Math.max(midRaw.length, 6);
+    const pad = midNoZero.padStart(padLen, '0');
+    const nombre = byMid.get(midRaw) || byMid.get(midNoZero) || byMid.get(pad) || obj.MatrizNombre || '';
+    return { ...obj, MatrizNombre: nombre };
+  };
+  return {
+    items: (items || []).map(mapMatriz),
+    perfiles: (perfiles || []).map(mapMatriz)
+  };
+};
 
 let cotizacionPerfilesSchema = null;
 const getCotizacionPerfilesSchema = async () => {
@@ -93,7 +134,8 @@ const loadCotizacionPerfiles = async (CotizacionId) => {
         Nombre: trimValue(r.Nombre) || '',
         PrecioBase: Number(r.PrecioBase || 0),
         Cantidad: Number(r.Cantidad || 0),
-        MatrizId: typeof r.MatrizId !== 'undefined' && r.MatrizId !== null ? r.MatrizId : null
+        MatrizId: typeof r.MatrizId !== 'undefined' && r.MatrizId !== null ? r.MatrizId : null,
+        MatrizNombre: ''
       }))
     : [];
 
@@ -352,6 +394,31 @@ router.get('/:id/editar', async (req, res) => {
     })) : [];
 
     const perfilesData = await loadCotizacionPerfiles(id);
+
+    // Enriquecer nombres de matriz en items y perfiles
+    try {
+      const matIds = new Set();
+      (itemsData || []).forEach(it => {
+        const mid = String(it.MatrizId || '').trim();
+        if (mid) matIds.add(mid);
+      });
+      (perfilesData || []).forEach(pf => {
+        const mid = String(pf.MatrizId || '').trim();
+        if (mid) matIds.add(mid);
+      });
+      if (matIds.size) {
+        const pm = {};
+        const inMs = Array.from(matIds).map((v,i)=>{ pm['m'+i]=v; return '@m'+i; }).join(',');
+        const mats = await SQL.Query('read', `
+          SELECT Material AS MatrizId, Descripcion AS Nombre
+          FROM dbo.MES_Materiales
+          WHERE Material IN (${inMs})
+        `, pm);
+        const byMid = new Map((Array.isArray(mats) ? mats : []).map(r => [String(r.MatrizId).trim(), r.Nombre]));
+        itemsData = (itemsData || []).map(it => ({ ...it, MatrizNombre: byMid.get(String(it.MatrizId).trim()) || it.MatrizNombre || '' }));
+        perfilesData = (perfilesData || []).map(pf => ({ ...pf, MatrizNombre: byMid.get(String(pf.MatrizId).trim()) || pf.MatrizNombre || '' }));
+      }
+    } catch (_) {}
 
     let contactoNombre = '';
     if (h.ContactoId) {
@@ -630,7 +697,7 @@ router.get('/:id', async (req, res) => {
 
     // Enriquecer con nombre de Matriz
     try {
-      const matIds = Array.from(new Set((items||[]).map(x => x.MatrizId).filter(v => v !== null && v !== undefined && v !== '')));
+      const matIds = Array.from(new Set((items||[]).map(x => String(x.MatrizId || '').trim()).filter(v => v)));
       if (matIds.length) {
         const pm = {};
         const inMs = matIds.map((v,i)=>{ pm['m'+i]=v; return '@m'+i; }).join(',');
@@ -639,12 +706,19 @@ router.get('/:id', async (req, res) => {
         FROM dbo.MES_Materiales
         WHERE Material IN (${inMs})
       `, pm);
-        const byMid = new Map((mats||[]).map(r => [r.MatrizId, r.Nombre]));
-        items = items.map(it => ({ ...it, MatrizNombre: byMid.get(it.MatrizId) || '' }));
+        const byMid = new Map((mats||[]).map(r => [String(r.MatrizId).trim(), r.Nombre]));
+        items = items.map(it => ({ ...it, MatrizNombre: byMid.get(String(it.MatrizId).trim()) || '' }));
       }
     } catch(_) {}
 
-    const perfiles = await loadCotizacionPerfiles(id);
+    let perfiles = await loadCotizacionPerfiles(id);
+
+    // Nombre de matriz para items y perfiles
+    try {
+      const enriched = await loadMatrizNames(items, perfiles);
+      items = enriched.items;
+      perfiles = enriched.perfiles;
+    } catch (_) {}
 
     // Totales (items + perfiles + extras)
     const subtotalAnalisis = items.reduce((a, x) => a + Number(x.PrecioBase || 0) * Number(x.Cantidad || 0), 0);
@@ -799,7 +873,7 @@ router.get('/:id/imprimir', async (req, res) => {
     } catch(_) {}
     // Enriquecer con nombre de Matriz
     try {
-      const matIds = Array.from(new Set((items||[]).map(x => x.MatrizId).filter(v => v !== null && v !== undefined && v !== '')));
+      const matIds = Array.from(new Set((items||[]).map(x => String(x.MatrizId || '').trim()).filter(v => v)));
       if (matIds.length) {
         const pm = {};
         const inMs = matIds.map((v,i)=>{ pm['m'+i]=v; return '@m'+i; }).join(',');
@@ -808,11 +882,18 @@ router.get('/:id/imprimir', async (req, res) => {
         FROM dbo.MES_Materiales
         WHERE Material IN (${inMs})
       `, pm);
-        const byMid = new Map((mats||[]).map(r => [r.MatrizId, r.Nombre]));
-        items = items.map(it => ({ ...it, MatrizNombre: byMid.get(it.MatrizId) || '' }));
+        const byMid = new Map((mats||[]).map(r => [String(r.MatrizId).trim(), r.Nombre]));
+        items = items.map(it => ({ ...it, MatrizNombre: byMid.get(String(it.MatrizId).trim()) || '' }));
       }
     } catch(_) {}
-    const perfiles = await loadCotizacionPerfiles(id);
+    let perfiles = await loadCotizacionPerfiles(id);
+
+    // Nombre de matriz para items y perfiles
+    try {
+      const enriched = await loadMatrizNames(items, perfiles);
+      items = enriched.items;
+      perfiles = enriched.perfiles;
+    } catch (_) {}
 
     const subtotalAnalisis = items.reduce((a, x) => a + Number(x.PrecioBase || 0) * Number(x.Cantidad || 0), 0);
     const subtotalItemsInternos = items
@@ -967,7 +1048,7 @@ router.get('/:id/solicitud', async (req, res) => {
 
     // Enriquecer matriz
     try {
-      const matIds = Array.from(new Set((items||[]).map(x => x.MatrizId).filter(v => v !== null && v !== undefined && v !== '')));
+      const matIds = Array.from(new Set((items||[]).map(x => String(x.MatrizId || '').trim()).filter(v => v)));
       if (matIds.length) {
         const pm = {};
         const inMs = matIds.map((v,i)=>{ pm['m'+i]=v; return '@m'+i; }).join(',');
@@ -976,12 +1057,19 @@ router.get('/:id/solicitud', async (req, res) => {
         FROM dbo.MES_Materiales
         WHERE Material IN (${inMs})
       `, pm);
-        const byMid = new Map((mats||[]).map(r => [r.MatrizId, r.Nombre]));
-        items = items.map(it => ({ ...it, MatrizNombre: byMid.get(it.MatrizId) || '' }));
+        const byMid = new Map((mats||[]).map(r => [String(r.MatrizId).trim(), r.Nombre]));
+        items = items.map(it => ({ ...it, MatrizNombre: byMid.get(String(it.MatrizId).trim()) || '' }));
       }
     } catch(_) {}
 
-    const perfiles = await loadCotizacionPerfiles(id);
+    let perfiles = await loadCotizacionPerfiles(id);
+
+    // Enriquecer nombre de matriz para items y perfiles
+    try {
+      const enriched = await loadMatrizNames(items, perfiles);
+      items = enriched.items;
+      perfiles = enriched.perfiles;
+    } catch (_) {}
 
     // Extras sin montos (solo descripciones)
     const extras = [
@@ -1081,7 +1169,11 @@ router.post('/crear', async (req, res) => {
       const Cantidad = Number(it.Cantidad || 1);
       const PrecioBase = asDecimal(it.Precio);
       const Empresa = it.Empresa || null;
-      const MatrizId = it.MatrizId ? Number(it.MatrizId) : null;
+      let MatrizId = null;
+      if (it.MatrizId !== undefined && it.MatrizId !== null) {
+        const mid = String(it.MatrizId).trim();
+        MatrizId = mid === '' ? null : mid;
+      }
       await SQL.Query('main', `
         INSERT INTO laboratorio.CotizacionAnalisis (CotizacionId, AnalisisId, Cantidad, PrecioBase, Empresa, MatrizId)
         VALUES (@CotizacionId, @AnalisisId, @Cantidad, @PrecioBase, @Empresa, @MatrizId)
@@ -1102,7 +1194,11 @@ router.post('/crear', async (req, res) => {
       const Cantidad = Number(pf.Cantidad || 1);
       const PrecioBase = asDecimal(pf.Precio);
       const NombrePerfil = trimValue(pf.Nombre || pf.Descripcion || '');
-      const MatrizId = pf.MatrizId ? Number(pf.MatrizId) : null;
+      let MatrizId = null;
+      if (pf.MatrizId !== undefined && pf.MatrizId !== null) {
+        const mid = String(pf.MatrizId).trim();
+        MatrizId = mid === '' ? null : mid;
+      }
 
       if (precioColumn) {
         const columns = ['CotizacionId', 'PerfilId', 'Nombre', precioColumn, 'Cantidad'];
@@ -1312,6 +1408,17 @@ router.post('/:id/editar', async (req, res) => {
     const rawCliente = (ClienteId||'').toString().trim();
     const clienteKey = rawCliente;
 
+    // Catálogo de matrices desde lectura para validar ids
+    let materialSet = new Set();
+    try {
+      const matsRead = await SQL.Query('read', 'SELECT Material FROM dbo.MES_Materiales');
+      if (Array.isArray(matsRead)) {
+        matsRead.forEach(m => {
+          if (m && typeof m.Material !== 'undefined' && m.Material !== null) materialSet.add(String(m.Material));
+        });
+      }
+    } catch (_) { materialSet = new Set(); }
+
     await SQL.Query('main', `
       UPDATE laboratorio.Cotizacion SET
         Fecha = @Fecha,
@@ -1353,7 +1460,11 @@ router.post('/:id/editar', async (req, res) => {
       const Cantidad = Number(it.Cantidad || 1);
       const PrecioBase = asDecimal(it.Precio);
       const Empresa = it.Empresa || null;
-      const MatrizId = it.MatrizId ? Number(it.MatrizId) : null;
+      let MatrizId = null;
+      if (it.MatrizId !== undefined && it.MatrizId !== null) {
+        const mid = String(it.MatrizId).trim();
+        MatrizId = mid === '' ? null : mid;
+      }
       await SQL.Query('main', `
         INSERT INTO laboratorio.CotizacionAnalisis (CotizacionId, AnalisisId, Cantidad, PrecioBase, Empresa, MatrizId)
         VALUES (@CotizacionId, @AnalisisId, @Cantidad, @PrecioBase, @Empresa, @MatrizId)
@@ -1376,7 +1487,11 @@ router.post('/:id/editar', async (req, res) => {
       const Cantidad = Number(pf.Cantidad || 1);
       const PrecioBase = asDecimal(pf.Precio);
       const NombrePerfil = trimValue(pf.Nombre || pf.Descripcion || '');
-      const MatrizId = pf.MatrizId ? Number(pf.MatrizId) : null;
+      let MatrizId = null;
+      if (pf.MatrizId !== undefined && pf.MatrizId !== null) {
+        const mid = String(pf.MatrizId).trim();
+        MatrizId = mid === '' ? null : mid;
+      }
 
       if (precioColumn) {
         const columns = ['CotizacionId', 'PerfilId', 'Nombre', precioColumn, 'Cantidad'];

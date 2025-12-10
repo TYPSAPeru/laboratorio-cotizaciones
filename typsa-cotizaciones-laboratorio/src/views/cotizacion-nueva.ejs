@@ -221,9 +221,7 @@
     </div>
 
     <div class="text-end">
-      <div><strong>Subtotal análisis: </strong><span id="subtotalAnalisis">0.00</span></div>
-      <div><strong>Subtotal perfiles: </strong><span id="subtotalPerfiles">0.00</span></div>
-      <div><strong>Subtotal general: </strong><span id="subtotal">0.00</span></div>
+      <div><strong>Subtotal: </strong><span id="subtotal">0.00</span></div>
       <div><strong>Descuento aplicado: </strong><span id="descuentoAplicado">0.00</span></div>
       <div class="fs-5"><strong>Total: </strong><span id="total">0.00</span></div>
     </div>
@@ -250,8 +248,6 @@
     const itemsHidden = document.getElementById('itemsHidden');
     const perfilesHidden = document.getElementById('perfilesHidden');
     const descuentoInput = document.getElementById('Descuento');
-    const subtotalAnalisisSpan = document.getElementById('subtotalAnalisis');
-    const subtotalPerfilesSpan = document.getElementById('subtotalPerfiles');
     const subtotalGeneralSpan = document.getElementById('subtotal');
     const perfilSelect = document.getElementById('perfilSelect');
     const perfilMatrizSelect = document.getElementById('perfilMatriz');
@@ -365,11 +361,11 @@
       const descuento = subtotalInternoAnalisis() * descPct;
       const total = subtotal - descuento;
       const symbol = getCurrencySymbol();
-      subtotalAnalisisSpan.textContent = `${symbol} ${fmtCurrency(subtotalAnalisis)}`;
-      subtotalPerfilesSpan.textContent = `${symbol} ${fmtCurrency(subtotalPerfiles)}`;
-      subtotalGeneralSpan.textContent = `${symbol} ${fmtCurrency(subtotal)}`;
-      document.getElementById('descuentoAplicado').textContent = `${symbol} ${fmtCurrency(descuento)}`;
-      document.getElementById('total').textContent = `${symbol} ${fmtCurrency(total)}`;
+      if (subtotalGeneralSpan) subtotalGeneralSpan.textContent = `${symbol} ${fmtCurrency(subtotal)}`;
+      const descEl = document.getElementById('descuentoAplicado');
+      if (descEl) descEl.textContent = `${symbol} ${fmtCurrency(descuento)}`;
+      const totalEl = document.getElementById('total');
+      if (totalEl) totalEl.textContent = `${symbol} ${fmtCurrency(total)}`;
       itemsHidden.value = JSON.stringify(items);
       perfilesHidden.value = JSON.stringify(perfilesSeleccionados);
     }
@@ -412,12 +408,12 @@
       }).catch(()=>{ item.MatricesLoading = false; });
     }
 
-    function optMatriz(list, selected){
+    function optMatriz(list, selected, selectedLabel){
       const data = (Array.isArray(list) && list.length ? list : MATRICES) || [];
       const normalizedSelected = String(selected || '');
       const hasSelected = data.some(m => String(m.MatrizId) === normalizedSelected);
       const finalData = (!hasSelected && normalizedSelected)
-        ? data.concat([{ MatrizId: normalizedSelected, Nombre: `#${normalizedSelected}` }])
+        ? data.concat([{ MatrizId: normalizedSelected, Nombre: selectedLabel || `#${normalizedSelected}` }])
         : data;
       return '<option value="">Seleccione...</option>' + finalData.map(m=>`<option value="${m.MatrizId}" ${normalizedSelected===String(m.MatrizId)?'selected':''}>${m.Nombre}</option>`).join('');
     }
@@ -434,7 +430,7 @@
         <tr>
           <td>${x.Ensayo}</td>
           <td>${x.Nombre||''}</td>
-          <td><select class="form-select form-select-sm matriz" data-idx="${idx}">${optMatriz(matricesForItem(x), x.MatrizId||'')}</select></td>
+          <td><select class="form-select form-select-sm matriz" data-idx="${idx}">${optMatriz(matricesForItem(x), x.MatrizId||'', x.MatrizNombre)}</select></td>
           <td>${x.Empresa||'-'}</td>
           <td><input type="number" class="form-control form-control-sm precio" data-idx="${idx}" value="${x.Precio||0}" step="0.01"></td>
           <td><input type="number" class="form-control form-control-sm cantidad" data-idx="${idx}" value="${x.Cantidad||1}" min="1"></td>
@@ -450,7 +446,7 @@
       tablaPerfilesBody.innerHTML = perfilesSeleccionados.map((p,idx)=>`
         <tr>
           <td>${p.Nombre || p.PerfilId}</td>
-          <td><select class="form-select form-select-sm perfil-matriz" data-idx="${idx}">${optMatriz(MATRICES, p.MatrizId || '')}</select></td>
+          <td><select class="form-select form-select-sm perfil-matriz" data-idx="${idx}">${optMatriz(MATRICES, p.MatrizId || '', p.MatrizNombre)}</select></td>
           <td><input type="number" class="form-control form-control-sm perfil-precio" data-idx="${idx}" value="${Number(p.Precio||0)}" step="0.01"></td>
           <td><input type="number" class="form-control form-control-sm perfil-cantidad" data-idx="${idx}" value="${Number(p.Cantidad||1)}" min="1"></td>
           <td>${symbol} ${fmtCurrency(Number(p.Precio||0)*Number(p.Cantidad||1))}</td>
@@ -576,12 +572,16 @@
         if (!Number.isFinite(cantidad) || cantidad <= 0) cantidad = 1;
         const existing = perfilesSeleccionados.find(p => p.PerfilId === id);
         const matrizId = perfilMatrizSelect ? (perfilMatrizSelect.value || '') : '';
+        const matrizNombre = perfilMatrizSelect && perfilMatrizSelect.selectedOptions && perfilMatrizSelect.selectedOptions[0]
+          ? perfilMatrizSelect.selectedOptions[0].textContent
+          : '';
         if (existing) {
           existing.Cantidad += cantidad;
           existing.Precio = precio;
           existing.MatrizId = matrizId;
+          existing.MatrizNombre = matrizNombre;
         } else {
-          perfilesSeleccionados.push({ PerfilId: id, Nombre: nombre, Precio: precio, Cantidad: cantidad, MatrizId: matrizId });
+          perfilesSeleccionados.push({ PerfilId: id, Nombre: nombre, Precio: precio, Cantidad: cantidad, MatrizId: matrizId, MatrizNombre: matrizNombre });
         }
         if (perfilCantidadInput) perfilCantidadInput.value = 1;
         if (perfilSelect) perfilSelect.value = '';
@@ -616,6 +616,9 @@
         const idx = Number(e.target.dataset.idx);
         if (Number.isNaN(idx)) return;
         perfilesSeleccionados[idx].MatrizId = e.target.value || '';
+        perfilesSeleccionados[idx].MatrizNombre = e.target.selectedOptions && e.target.selectedOptions[0]
+          ? e.target.selectedOptions[0].textContent
+          : '';
         renderPerfiles();
       });
     }
@@ -646,7 +649,8 @@
           ...p,
           Precio: Number.isFinite(precio) ? precio : 0,
           Cantidad: Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 1,
-          MatrizId: matriz
+          MatrizId: matriz,
+          MatrizNombre: p.MatrizNombre || ''
         };
       });
       renderPerfiles();

@@ -124,8 +124,6 @@
   <% } %>
 
   <div class="text-end mt-3">
-    <div><strong>Subtotal análisis:</strong> <%= currencySymbol %> <%= convert(totales.subtotalAnalisis||0).toFixed(2) %></div>
-    <div><strong>Subtotal perfiles:</strong> <%= currencySymbol %> <%= convert(totales.subtotalPerfiles||0).toFixed(2) %></div>
     <div><strong>Subtotal items:</strong> <%= currencySymbol %> <%= convert(totales.subtotalItems||0).toFixed(2) %></div>
     <div><strong>Subtotal extras:</strong> <%= currencySymbol %> <%= convert(totales.subtotalExtras||0).toFixed(2) %></div>
     <div><strong>Subtotal:</strong> <%= currencySymbol %> <%= convert(totales.subtotal).toFixed(2) %></div>
@@ -155,3 +153,5 @@
   <%- include('./partials/footer') %>
 </body>
 </html>
+
+
