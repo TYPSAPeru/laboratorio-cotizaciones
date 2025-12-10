@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <%- include('./partials/meta', { titulo: 'Nueva Cotización' }) %>
+  <%- include('./partials/meta', { titulo: (coti ? 'Editar Cotización' : 'Nueva Cotización') }) %>
   <style>
     .suggestions { position: relative; }
     .suggestions-list { position: absolute; z-index: 1000; width: 100%; max-height: 240px; overflow: auto; background: #fff; border: 1px solid #ddd; border-radius: .25rem; }
@@ -16,43 +16,43 @@
     <div class="alert alert-warning my-3">No se pudo cargar algunos datos: <%= error %></div>
   <% } %>
 
-  <h2 class="mb-3">Nueva Cotización</h2>
+  <h2 class="mb-3"><%= coti ? 'Editar Cotización' : 'Nueva Cotización' %></h2>
 
-  <form id="form-cotizacion" method="POST" action="/cotizaciones/crear" class="mb-4">
+  <form id="form-cotizacion" method="POST" action="<%= coti ? ('/cotizaciones/' + coti.CotizacionId + '/editar') : '/cotizaciones/crear' %>" class="mb-4">
     <div class="row g-3">
       <div class="col-md-3">
         <label class="form-label">Fecha</label>
-        <input type="date" name="Fecha" class="form-control" required>
+        <input type="date" name="Fecha" class="form-control" required value="<%= coti && coti.FechaValue ? coti.FechaValue : '' %>">
       </div>
       <div class="col-md-4">
         <label class="form-label">Descripción</label>
-        <input type="text" name="Descripcion" class="form-control" placeholder="Descripción" required>
+        <input type="text" name="Descripcion" class="form-control" placeholder="Descripción" required value="<%= coti && coti.Descripcion ? coti.Descripcion : '' %>">
       </div>
       <div class="col-md-2">
         <label class="form-label">Descuento (%)</label>
-        <input type="number" name="Descuento" id="Descuento" step="0.01" class="form-control" value="0">
+        <input type="number" name="Descuento" id="Descuento" step="0.01" class="form-control" value="<%= coti && (coti.Descuento || coti.Descuento === 0) ? coti.Descuento : 0 %>">
       </div>
       <div class="col-md-3">
         <label class="form-label">Moneda</label>
         <select name="Moneda" id="Moneda" class="form-select">
-          <option value="PEN" selected>Soles (PEN)</option>
-          <option value="USD">Dólares (USD)</option>
-          <option value="EUR">Euros (EUR)</option>
+          <option value="PEN" <%= !coti || (coti.Moneda||'').toUpperCase()==='PEN' ? 'selected' : '' %>>Soles (PEN)</option>
+          <option value="USD" <%= coti && (coti.Moneda||'').toUpperCase()==='USD' ? 'selected' : '' %>>Dólares (USD)</option>
+          <option value="EUR" <%= coti && (coti.Moneda||'').toUpperCase()==='EUR' ? 'selected' : '' %>>Euros (EUR)</option>
         </select>
       </div>
     </div>
     <div class="row g-3 mt-1">
       <div class="col-md-3">
         <label class="form-label">Tipo de cambio</label>
-        <input type="number" step="0.0001" min="0" name="TipoCambio" id="TipoCambio" class="form-control" value="1" required>
+        <input type="number" step="0.0001" min="0" name="TipoCambio" id="TipoCambio" class="form-control" value="<%= coti && coti.TipoCambio ? coti.TipoCambio : 1 %>" required>
         <div class="form-text">Soles por unidad de moneda extranjera</div>
       </div>
       <div class="col-md-5">
         <label class="form-label">Cliente</label>
         <select name="ClienteId" id="ClienteId" class="form-select" required>
-          <option value="" disabled selected>Seleccione un cliente</option>
+          <option value="" disabled <%= coti ? '' : 'selected' %>>Seleccione un cliente</option>
           <% (clientes || []).forEach(c => { %>
-            <option value="<%= c.Codigo %>" data-codigo="<%= c.Codigo %>"><%= c.Nombre %></option>
+            <option value="<%= c.Codigo %>" data-codigo="<%= c.Codigo %>" <%= coti && String(coti.ClienteId).trim() === String(c.Codigo).trim() ? 'selected' : '' %>><%= c.Nombre %></option>
           <% }) %>
         </select>
         <% if (!clientes || clientes.length === 0) { %>
@@ -62,7 +62,10 @@
       <div class="col-md-4">
         <label class="form-label">Dirigido a (Contacto)</label>
         <select name="ContactoId" id="ContactoId" class="form-select">
-          <option value="" selected>Seleccione un contacto</option>
+          <option value="" <%= coti && coti.ContactoId ? '' : 'selected' %>>Seleccione un contacto</option>
+          <% if (coti && coti.ContactoId) { %>
+            <option value="<%= coti.ContactoId %>" selected><%= coti.contactoNombre || ('Contacto #' + coti.ContactoId) %></option>
+          <% } %>
         </select>
       </div>
     </div>
@@ -82,47 +85,47 @@
     <div class="row g-3">
       <div class="col-md-8">
         <label class="form-label">Personal (descripción)</label>
-        <textarea name="Personal" class="form-control" rows="2" placeholder="p.ej. 02 Analistas por 08 dias"></textarea>
+        <textarea name="Personal" class="form-control" rows="2" placeholder="p.ej. 02 Analistas por 08 dias"><%= coti && coti.Personal ? coti.Personal : '' %></textarea>
       </div>
       <div class="col-md-4">
         <label class="form-label">Personal (monto)</label>
-        <input type="number" step="0.01" name="PersonalPrecio" class="form-control" value="0">
+        <input type="number" step="0.01" name="PersonalPrecio" class="form-control" value="<%= coti && (coti.PersonalPrecio || coti.PersonalPrecio===0) ? coti.PersonalPrecio : 0 %>">
       </div>
 
       <div class="col-md-8">
         <label class="form-label">Gastos Operativos</label>
-        <textarea name="Operativos" class="form-control" rows="4" placeholder="TYPSA: Traslado, alimentación, hospedaje...&#10;CLIENTE: Facilidades de acceso... "></textarea>
+        <textarea name="Operativos" class="form-control" rows="4" placeholder="TYPSA: Traslado, alimentación, hospedaje...&#10;CLIENTE: Facilidades de acceso... "><%= coti && coti.Operativos ? coti.Operativos : '' %></textarea>
       </div>
         <div class="col-md-4">
         <label class="form-label">Operativos (monto)</label>
-        <input type="number" step="0.01" name="OperativosPrecio" class="form-control" value="0">
+        <input type="number" step="0.01" name="OperativosPrecio" class="form-control" value="<%= coti && (coti.OperativosPrecio || coti.OperativosPrecio===0) ? coti.OperativosPrecio : 0 %>">
       </div>
 
       <div class="col-md-8">
         <label class="form-label">Consideraciones</label>
-        <textarea name="Consideraciones" class="form-control" rows="2" placeholder="p.ej. Grupo electrógeno + combustible"></textarea>
+        <textarea name="Consideraciones" class="form-control" rows="2" placeholder="p.ej. Grupo electrógeno + combustible"><%= coti && coti.Consideraciones ? coti.Consideraciones : '' %></textarea>
       </div>
       <div class="col-md-4">
         <label class="form-label">Consideraciones (monto)</label>
-        <input type="number" step="0.01" name="ConsideracionesPrecio" class="form-control" value="0">
+        <input type="number" step="0.01" name="ConsideracionesPrecio" class="form-control" value="<%= coti && (coti.ConsideracionesPrecio || coti.ConsideracionesPrecio===0) ? coti.ConsideracionesPrecio : 0 %>">
       </div>
 
       <div class="col-md-8">
         <label class="form-label">Informe</label>
-        <textarea name="Informe" class="form-control" rows="2" placeholder="Se entregará informe de ensayo en formato digital"></textarea>
+        <textarea name="Informe" class="form-control" rows="2" placeholder="Se entregará informe de ensayo en formato digital"><%= coti && coti.Informe ? coti.Informe : '' %></textarea>
       </div>
       <div class="col-md-4">
         <label class="form-label">Informe (monto)</label>
-        <input type="number" step="0.01" name="InformePrecio" class="form-control" value="0">
+        <input type="number" step="0.01" name="InformePrecio" class="form-control" value="<%= coti && (coti.InformePrecio || coti.InformePrecio===0) ? coti.InformePrecio : 0 %>">
       </div>
 
       <div class="col-md-8">
         <label class="form-label">Otros generales</label>
-        <textarea name="Otros" class="form-control" rows="4" placeholder="Visita técnica, traslados, etc."></textarea>
+        <textarea name="Otros" class="form-control" rows="4" placeholder="Visita técnica, traslados, etc."><%= coti && coti.Otros ? coti.Otros : '' %></textarea>
       </div>
       <div class="col-md-4">
         <label class="form-label">Otros (monto)</label>
-        <input type="number" step="0.01" name="OtrosPrecio" class="form-control" value="0">
+        <input type="number" step="0.01" name="OtrosPrecio" class="form-control" value="<%= coti && (coti.OtrosPrecio || coti.OtrosPrecio===0) ? coti.OtrosPrecio : 0 %>">
       </div>
     </div>
 
@@ -229,7 +232,7 @@
     <input type="hidden" name="perfiles" id="perfilesHidden">
     <div class="text-end mt-3">
       <a href="/cotizaciones" class="btn btn-secondary">Cancelar</a>
-      <button class="btn btn-success">Crear Cotización</button>
+      <button class="btn btn-success"><%= coti ? 'Guardar cambios' : 'Crear Cotización' %></button>
     </div>
   </form>
 
@@ -237,6 +240,8 @@
   <script>
     const MATRICES = <%- JSON.stringify(matrices || []) %>;
     const PERFILES = <%- JSON.stringify(perfiles || []) %>;
+    const initialItems = <%- JSON.stringify(itemsData || []) %>;
+    const initialPerfiles = <%- JSON.stringify(perfilesData || []) %>;
     const buscar = document.getElementById('buscarAnalisis');
     const sugerencias = document.getElementById('sugerencias');
     const cantidadInput = document.getElementById('cantidadAnalisis');
@@ -290,7 +295,7 @@
         recalc();
       }
     });
-    // Set default date to today (local)
+    // Set default date to today (local) if empty
     (function setDefaultDate(){
       const fechaInput = document.querySelector('input[name="Fecha"]');
       if (fechaInput && !fechaInput.value) {
@@ -316,9 +321,11 @@
           incoming.forEach(x => {
             if (items.find(it => it.Ensayo === x.Ensayo)) return; // evitar duplicados
             items.push({
+              AnalisisId: x.AnalisisId || '',
               Ensayo: x.Ensayo,
               Nombre: x.Nombre || '',
               Empresa: x.Empresa || null,
+              MatrizId: '',
               Precio: Number(x.Precio || 0),
               Cantidad: 1,
               Observaciones: ''
@@ -611,6 +618,17 @@
         perfilesSeleccionados[idx].MatrizId = e.target.value || '';
         renderPerfiles();
       });
+    }
+
+    // Cargar datos iniciales (edición)
+    if (Array.isArray(initialItems) && initialItems.length) {
+      items = initialItems;
+      items.forEach(it => ensureMatricesForItem(it));
+      renderItems();
+    }
+    if (Array.isArray(initialPerfiles) && initialPerfiles.length) {
+      perfilesSeleccionados = initialPerfiles;
+      renderPerfiles();
     }
     recalc();
   </script>

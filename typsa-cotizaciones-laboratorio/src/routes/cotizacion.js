@@ -271,7 +271,131 @@ router.get('/nueva', async (req, res) => {
     error = error || e.message;
   }
 
-  return res.render('cotizacion-nueva', { clientes, empleados, matrices, perfiles, logged: req.logged, error });
+  return res.render('cotizacion-nueva', { clientes, matrices, perfiles, logged: req.logged, error, coti: null, itemsData: [], perfilesData: [] });
+});
+
+// Editar cotización (formulario)
+router.get('/:id/editar', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).send('Id inválido');
+  let error = null;
+  try {
+    const header = await SQL.Query('main', `
+      SELECT TOP 1
+        CotizacionId, Fecha, Descripcion, Descuento, ClienteId, ContactoId,
+        Personal, PersonalPrecio, Operativos, OperativosPrecio,
+        Consideraciones, ConsideracionesPrecio, Informe, InformePrecio,
+        Otros, OtrosPrecio,
+        Moneda, TipoCambio, Aprobada
+      FROM laboratorio.Cotizacion
+      WHERE CotizacionId = @id
+    `, { id });
+    if (!Array.isArray(header) || !header.length) return res.status(404).send('Cotización no encontrada');
+    const h = header[0];
+    if (h.Aprobada) return res.status(400).send('No se puede editar una cotización aprobada');
+
+    const rClientes = await SQL.Query('read', 'SELECT * FROM dbo.Ges_Clientes');
+    const clientes = Array.isArray(rClientes)
+      ? rClientes.map(c => ({
+          Codigo: c.Codigo ?? c.codigo ?? null,
+          Nombre: c.Nombre ?? null,
+          NombreComercial: c.Nombre_Comercial ?? null,
+          Nif: c.Nif ?? null,
+          Direccion: c.Direccion ?? c.direccion ?? null,
+          Display: (c.Nombre_Comercial ?? c.Nombre) ?? ''
+        }))
+      : [];
+
+    const rMatrices = await SQL.Query('read', `
+      SELECT Material AS MatrizId, Descripcion AS Nombre
+      FROM dbo.MES_Materiales
+      ORDER BY Descripcion
+    `);
+    const matrices = Array.isArray(rMatrices) ? rMatrices : [];
+
+    const basePerfiles = await SQL.Query('read', `
+      SELECT RTRIM(LTRIM(Perfil)) AS PerfilId, Descripcion
+      FROM dbo.LMS_Perfiles
+      ORDER BY Descripcion
+    `);
+    const precios = await SQL.Query('main', `
+      SELECT RTRIM(LTRIM(PerfilId)) AS PerfilId, PrecioBase
+      FROM laboratorio.PerfilesLaboratorio
+    `);
+    const priceMap = new Map((Array.isArray(precios) ? precios : []).map(p => [perfilKey(p.PerfilId), Number(p.PrecioBase || 0)]));
+    const perfiles = (Array.isArray(basePerfiles) ? basePerfiles : []).map(p => {
+      const idPf = trimValue(p.PerfilId);
+      const key = perfilKey(idPf);
+      return {
+        PerfilId: idPf,
+        Nombre: p.Descripcion || '',
+        PrecioBase: priceMap.has(key) ? priceMap.get(key) : null
+      };
+    }).filter(p => p.PerfilId);
+
+    const detalle = await SQL.Query('main', `
+      SELECT ca.AnalisisId AS Ensayo, ca.Empresa, ca.MatrizId, ca.PrecioBase AS Precio, ca.Cantidad, al.Nombre
+      FROM laboratorio.CotizacionAnalisis ca
+      LEFT JOIN laboratorio.AnalisisLaboratorio al ON al.AnalisisId = ca.AnalisisId
+      WHERE ca.CotizacionId = @id
+      ORDER BY ca.AnalisisId
+    `, { id });
+    const itemsData = Array.isArray(detalle) ? detalle.map(d => ({
+      AnalisisId: d.Ensayo,
+      Ensayo: d.Ensayo,
+      Nombre: d.Nombre || '',
+      Empresa: d.Empresa || '',
+      MatrizId: d.MatrizId || '',
+      Precio: Number(d.Precio || 0),
+      Cantidad: Number(d.Cantidad || 1),
+      Observaciones: ''
+    })) : [];
+
+    const perfilesData = await loadCotizacionPerfiles(id);
+
+    let contactoNombre = '';
+    if (h.ContactoId) {
+      const contact = await SQL.Query('read', 'SELECT TOP 1 * FROM dbo.Ges_Clientes_Contactos WHERE Codigo = @Codigo', { Codigo: h.ContactoId });
+      if (Array.isArray(contact) && contact.length)
+        contactoNombre = contact[0].Nombre || '';
+    }
+
+    const coti = {
+      CotizacionId: h.CotizacionId,
+      FechaValue: (h.Fecha && h.Fecha.toISOString) ? h.Fecha.toISOString().split('T')[0] : (h.Fecha || ''),
+      Descripcion: h.Descripcion || '',
+      Descuento: h.Descuento || 0,
+      ClienteId: h.ClienteId || '',
+      ContactoId: h.ContactoId || '',
+      contactoNombre,
+      Personal: h.Personal || '',
+      PersonalPrecio: h.PersonalPrecio || 0,
+      Operativos: h.Operativos || '',
+      OperativosPrecio: h.OperativosPrecio || 0,
+      Consideraciones: h.Consideraciones || '',
+      ConsideracionesPrecio: h.ConsideracionesPrecio || 0,
+      Informe: h.Informe || '',
+      InformePrecio: h.InformePrecio || 0,
+      Otros: h.Otros || '',
+      OtrosPrecio: h.OtrosPrecio || 0,
+      Moneda: (h.Moneda || 'PEN').toUpperCase(),
+      TipoCambio: h.TipoCambio || 1
+    };
+
+    return res.render('cotizacion-nueva', {
+      clientes,
+      matrices,
+      perfiles,
+      logged: req.logged,
+      error,
+      coti,
+      itemsData,
+      perfilesData
+    });
+  } catch (e) {
+    console.error('Error al cargar edición de cotización:', e);
+    return res.status(500).send('Error al cargar la cotización para editar');
+  }
 });
 
 // API de bÃºsqueda de anÃ¡lisis para autocomplete
@@ -1146,6 +1270,158 @@ router.post('/:id/aprobar', async (req, res) => {
   } catch (e) {
     console.error('Error al aprobar cotizacion:', e);
     return res.status(500).send('Error al aprobar la cotizacion');
+  }
+});
+
+// Editar cotización con múltiples análisis
+router.post('/:id/editar', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).send('Id inválido');
+  try {
+    const hdr = await SQL.Query('main', 'SELECT TOP 1 Aprobada FROM laboratorio.Cotizacion WHERE CotizacionId = @id', { id });
+    if (!Array.isArray(hdr) || !hdr.length) return res.status(404).send('Cotización no encontrada');
+    if (hdr[0].Aprobada) return res.status(400).send('No se puede editar una cotización aprobada');
+
+    const { Fecha, Descripcion, Descuento = 0 } = req.body;
+    let { ClienteId, ContactoId } = req.body;
+    const EmpleadoId = req.logged && req.logged.EmpleadoId ? req.logged.EmpleadoId : null;
+    if (!EmpleadoId) return res.status(400).send('Empleado no encontrado en la sesión');
+
+    const Personal = (req.body.Personal || '').toString();
+    const Operativos = (req.body.Operativos || '').toString();
+    const Consideraciones = (req.body.Consideraciones || '').toString();
+    const Informe = (req.body.Informe || '').toString();
+    const Otros = (req.body.Otros || '').toString();
+    const PersonalPrecio = asDecimal(req.body.PersonalPrecio);
+    const OperativosPrecio = asDecimal(req.body.OperativosPrecio);
+    const ConsideracionesPrecio = asDecimal(req.body.ConsideracionesPrecio);
+    const InformePrecio = asDecimal(req.body.InformePrecio);
+    const OtrosPrecio = asDecimal(req.body.OtrosPrecio);
+    const descuentoNum = asDecimal(Descuento);
+    let Moneda = (req.body.Moneda || 'PEN').toString().trim().toUpperCase();
+    if (!Moneda) Moneda = 'PEN';
+    let TipoCambio = asDecimal(req.body.TipoCambio);
+    if (!Number.isFinite(TipoCambio) || TipoCambio <= 0) TipoCambio = 1;
+    if (Moneda === 'PEN') TipoCambio = 1;
+
+    let items = [];
+    let perfilesSeleccionados = [];
+    try { items = JSON.parse(req.body.items || '[]'); } catch (_) { items = []; }
+    try { perfilesSeleccionados = JSON.parse(req.body.perfiles || '[]'); } catch (_) { perfilesSeleccionados = []; }
+
+    const rawCliente = (ClienteId||'').toString().trim();
+    const clienteKey = rawCliente;
+
+    await SQL.Query('main', `
+      UPDATE laboratorio.Cotizacion SET
+        Fecha = @Fecha,
+        Descripcion = @Descripcion,
+        EmpleadoId = @EmpleadoId,
+        Descuento = @Descuento,
+        ClienteId = @ClienteId,
+        ContactoId = @ContactoId,
+        Personal = @Personal,
+        PersonalPrecio = @PersonalPrecio,
+        Operativos = @Operativos,
+        OperativosPrecio = @OperativosPrecio,
+        Consideraciones = @Consideraciones,
+        ConsideracionesPrecio = @ConsideracionesPrecio,
+        Informe = @Informe,
+        InformePrecio = @InformePrecio,
+        Otros = @Otros,
+        OtrosPrecio = @OtrosPrecio,
+        Moneda = @Moneda,
+        TipoCambio = @TipoCambio
+      WHERE CotizacionId = @CotizacionId
+    `, {
+      CotizacionId: id,
+      Fecha,
+      Descripcion,
+      EmpleadoId,
+      Descuento: descuentoNum,
+      ClienteId: clienteKey,
+      ContactoId,
+      Personal, PersonalPrecio, Operativos, OperativosPrecio,
+      Consideraciones, ConsideracionesPrecio, Informe, InformePrecio,
+      Otros, OtrosPrecio,
+      Moneda, TipoCambio
+    });
+
+    await SQL.Query('main', 'DELETE FROM laboratorio.CotizacionAnalisis WHERE CotizacionId = @id', { id });
+    for (const it of items) {
+      const AnalisisId = it.AnalisisId || it.Ensayo;
+      const Cantidad = Number(it.Cantidad || 1);
+      const PrecioBase = asDecimal(it.Precio);
+      const Empresa = it.Empresa || null;
+      const MatrizId = it.MatrizId ? Number(it.MatrizId) : null;
+      await SQL.Query('main', `
+        INSERT INTO laboratorio.CotizacionAnalisis (CotizacionId, AnalisisId, Cantidad, PrecioBase, Empresa, MatrizId)
+        VALUES (@CotizacionId, @AnalisisId, @Cantidad, @PrecioBase, @Empresa, @MatrizId)
+      `, { CotizacionId: id, AnalisisId, Cantidad, PrecioBase, Empresa, MatrizId });
+    }
+
+    await SQL.Query('main', 'DELETE FROM laboratorio.CotizacionPerfiles WHERE CotizacionId = @id', { id });
+    const schemaCols = await getCotizacionPerfilesSchema();
+    const hasPrecioBaseCol = schemaCols.includes('preciobase');
+    const hasPrecioCol = schemaCols.includes('precio');
+    const hasPrecioUnitarioCol = schemaCols.includes('preciounitario');
+    const hasMatrizCol = schemaCols.includes('matrizid');
+    const precioColumn = hasPrecioBaseCol ? 'PrecioBase' : (hasPrecioCol ? 'Precio' : (hasPrecioUnitarioCol ? 'PrecioUnitario' : null));
+
+    for (const pf of perfilesSeleccionados) {
+      const rawPerfilId = trimValue(pf.PerfilId || pf.id);
+      if (!rawPerfilId) continue;
+      const perfilNumeric = Number(perfilKey(rawPerfilId));
+      const PerfilId = Number.isFinite(perfilNumeric) ? perfilNumeric : rawPerfilId;
+      const Cantidad = Number(pf.Cantidad || 1);
+      const PrecioBase = asDecimal(pf.Precio);
+      const NombrePerfil = trimValue(pf.Nombre || pf.Descripcion || '');
+      const MatrizId = pf.MatrizId ? Number(pf.MatrizId) : null;
+
+      if (precioColumn) {
+        const columns = ['CotizacionId', 'PerfilId', 'Nombre', precioColumn, 'Cantidad'];
+        const values = ['@CotizacionId', '@PerfilId', '@Nombre', '@PrecioBase', '@Cantidad'];
+        if (hasMatrizCol) {
+          columns.push('MatrizId');
+          values.push('@MatrizId');
+        }
+        const sqlInsert = `
+          INSERT INTO laboratorio.CotizacionPerfiles (${columns.join(', ')})
+          VALUES (${values.join(', ')})
+        `;
+        await SQL.Query('main', sqlInsert, {
+          CotizacionId: id,
+          PerfilId,
+          Nombre: NombrePerfil || null,
+          PrecioBase,
+          Cantidad,
+          MatrizId
+        });
+      } else {
+        const columns = ['CotizacionId', 'PerfilId', 'Nombre', 'Cantidad'];
+        const values = ['@CotizacionId', '@PerfilId', '@Nombre', '@Cantidad'];
+        if (hasMatrizCol) {
+          columns.push('MatrizId');
+          values.push('@MatrizId');
+        }
+        const sqlInsert = `
+          INSERT INTO laboratorio.CotizacionPerfiles (${columns.join(', ')})
+          VALUES (${values.join(', ')})
+        `;
+        await SQL.Query('main', sqlInsert, {
+          CotizacionId: id,
+          PerfilId,
+          Nombre: NombrePerfil || null,
+          Cantidad,
+          MatrizId
+        });
+      }
+    }
+
+    return res.redirect(`/cotizaciones/${id}`);
+  } catch (err) {
+    console.error('Error al editar cotización:', err);
+    return res.status(500).send('Error al editar la cotización');
   }
 });
 

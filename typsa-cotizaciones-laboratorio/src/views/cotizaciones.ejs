@@ -60,6 +60,9 @@ t
             <td class="text-nowrap">
               <a class="btn btn-sm btn-outline-primary" href="/cotizaciones/<%= c.CotizacionId %>">Ver</a>
               <% if (!c.Aprobada) { %>
+              <a class="btn btn-sm btn-outline-secondary" href="/cotizaciones/<%= c.CotizacionId %>/editar">Editar</a>
+              <% } %>
+              <% if (!c.Aprobada) { %>
               <form action="/cotizaciones/<%= c.CotizacionId %>/aprobar" method="POST" style="display:inline" onsubmit="return confirm('Aprobar cotizacion #<%= c.CotizacionId %>?');">
                 <button class="btn btn-sm btn-success">Aprobar</button>
               </form>
