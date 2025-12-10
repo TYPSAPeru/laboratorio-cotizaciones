@@ -622,12 +622,33 @@
 
     // Cargar datos iniciales (edición)
     if (Array.isArray(initialItems) && initialItems.length) {
-      items = initialItems;
+      items = initialItems.map(it => {
+        const precio = Number(it.Precio ?? it.PrecioBase ?? 0);
+        const cantidad = Number(it.Cantidad || 1);
+        const matriz = (it.MatrizId != null) ? String(it.MatrizId) : '';
+        return {
+          ...it,
+          MatrizId: matriz,
+          Precio: Number.isFinite(precio) ? precio : 0,
+          Cantidad: Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 1
+        };
+      });
       items.forEach(it => ensureMatricesForItem(it));
       renderItems();
     }
     if (Array.isArray(initialPerfiles) && initialPerfiles.length) {
-      perfilesSeleccionados = initialPerfiles;
+      perfilesSeleccionados = initialPerfiles.map(p => {
+        const precio = Number(p.Precio ?? p.PrecioBase ?? 0);
+        const cantidad = Number(p.Cantidad || 1);
+        const matrizRaw = (p.MatrizId != null && p.MatrizId !== undefined) ? String(p.MatrizId) : '';
+        const matriz = matrizRaw === 'null' ? '' : matrizRaw;
+        return {
+          ...p,
+          Precio: Number.isFinite(precio) ? precio : 0,
+          Cantidad: Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 1,
+          MatrizId: matriz
+        };
+      });
       renderPerfiles();
     }
     recalc();
