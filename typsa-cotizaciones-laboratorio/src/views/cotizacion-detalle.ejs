@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <%- include('./partials/meta', { titulo: 'Detalle de Cotizacion' }) %>
@@ -104,7 +104,7 @@
       <div class="fw-bold mb-1">Gastos del servicio</div>
       <table class="table table-bordered table-sm align-middle">
         <thead>
-          <tr><th style="width:35%">Concepto</th><th>Descripción</th><th style="width:16%">Monto (<%= currencySymbol %>)</th></tr>
+          <tr><th style="width:35%">Concepto</th><th>DescripciÃ³n</th><th style="width:16%">Monto (<%= currencySymbol %>)</th></tr>
         </thead>
         <tbody>
           <% extras.forEach(e => { %>
@@ -136,10 +136,13 @@
   <div class="text-end mt-4">
     <a href="/cotizaciones/<%= header.CotizacionId %>/imprimir" class="btn btn-outline-secondary" target="_blank">Imprimir / PDF</a>
     <% if (header.Aprobada) { %>
-    <a href="/cotizaciones/<%= header.CotizacionId %>/solicitud" class="btn btn-outline-secondary" target="_blank">Solicitud de servicios</a>
+    <a href="/cotizaciones/<%= header.CotizacionId %>/solicitud" class="btn btn-outline-secondary" target="_blank">Solicitud de servicios</a>
+    <form action="/cotizaciones/<%= header.CotizacionId %>/duplicar" method="POST" style="display:inline" onsubmit="return confirm('Duplicar esta cotizacion?');">
+      <button class="btn btn-outline-primary">Duplicar</button>
+    </form>
     <% } %>
     <% if (!header.Aprobada) { %>
-    <form action="/cotizaciones/<%= header.CotizacionId %>/aprobar" method="POST" style="display:inline" onsubmit="return confirm('¿Aprobar esta cotizacion?');">
+    <form action="/cotizaciones/<%= header.CotizacionId %>/aprobar" method="POST" style="display:inline" onsubmit="return confirm('Â¿Aprobar esta cotizacion?');">
       <button class="btn btn-success">Aprobar solicitud</button>
     </form>
     <% } %>
@@ -153,5 +156,12 @@
   <%- include('./partials/footer') %>
 </body>
 </html>
+
+
+
+
+
+
+
 
 

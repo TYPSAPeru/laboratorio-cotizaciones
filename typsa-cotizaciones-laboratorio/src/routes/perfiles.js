@@ -102,7 +102,7 @@ router.get('/:id/analisis', async (req, res) => {
     const lista = await SQL.Query('read', `
       SELECT pa.Perfil AS PerfilId, pa.Ensayo AS AnalisisId, ens.Nombre
       FROM dbo.LMS_Ensayos_Perfiles pa
-      LEFT JOIN dbo.MES_ensayos ens ON ens.Ensayo = pa.Ensayo
+      LEFT JOIN dbo.MES_ensayos ens ON ens.Ensayo = pa.Ensayo AND ISNULL(ens.Baja,0) = 0
       WHERE RTRIM(LTRIM(pa.Perfil)) = @PerfilId
       ORDER BY ens.Nombre
     `, { PerfilId: PerfilId });

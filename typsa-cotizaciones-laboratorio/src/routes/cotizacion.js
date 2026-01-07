@@ -22,7 +22,7 @@ const perfilKey = (val) => {
 const currencyCatalog = {
   PEN: { symbol: 'S/', label: 'Soles (PEN)' },
   USD: { symbol: 'US$', label: 'Dólares (USD)' },
-  EUR: { symbol: 'â¬', label: 'Euros (EUR)' }
+  EUR: { symbol: 'â?¬', label: 'Euros (EUR)' }
 };
 
 const buildCurrencyInfo = (codeRaw, tipoCambioRaw) => {
@@ -478,6 +478,7 @@ router.get('/api/analisis', async (req, res) => {
         Limite_Deteccion,
         Limite_Cuantificacion
       FROM dbo.MES_ensayos
+      WHERE ISNULL(Baja,0) = 0
     `);
     const complementos = await SQL.Query('main', 'SELECT * FROM laboratorio.AnalisisLaboratorio');
     const compList = Array.isArray(complementos) ? complementos : [];
@@ -525,7 +526,7 @@ router.get('/api/analisis/by-ids', async (req, res) => {
     const ensayos = await SQL.Query('read', `
       SELECT Ensayo, Nombre, Seccion, Metodo_Analitico, Limite_Deteccion, Limite_Cuantificacion
       FROM dbo.MES_ensayos
-      WHERE Ensayo IN (${inRead})
+      WHERE ISNULL(Baja,0) = 0 AND Ensayo IN (${inRead})
     `, paramsRead);
 
     // Obtener complementos por Nombre (no existe columna 'Ensayo' en AnalisisLaboratorio)
@@ -661,7 +662,11 @@ router.get('/:id', async (req, res) => {
         if (names.length) {
           const pr = {};
           const inNames = names.map((v,i)=>{ pr['n'+i]=v; return '@n'+i; }).join(',');
-          const ens = await SQL.Query('read', `SELECT Nombre, Limite_Deteccion, Limite_Cuantificacion, PNT FROM dbo.MES_ensayos WHERE Nombre IN (${inNames})`, pr);
+          const ens = await SQL.Query('read', `
+            SELECT Nombre, Limite_Deteccion, Limite_Cuantificacion, PNT
+            FROM dbo.MES_ensayos
+            WHERE ISNULL(Baja,0) = 0 AND Nombre IN (${inNames})
+          `, pr);
           const byName = new Map((ens||[]).map(r => [r.Nombre, r]));
           let pntMap = new Map();
           const pntCodes = Array.from(new Set((ens||[]).map(r => r.PNT).filter(Boolean)));
@@ -838,7 +843,11 @@ router.get('/:id/imprimir', async (req, res) => {
         if (names.length) {
           const pr = {};
           const inNames = names.map((v,i)=>{ pr['n'+i]=v; return '@n'+i; }).join(',');
-          const ens = await SQL.Query('read', `SELECT Nombre, Limite_Deteccion, Limite_Cuantificacion, PNT FROM dbo.MES_ensayos WHERE Nombre IN (${inNames})`, pr);
+          const ens = await SQL.Query('read', `
+            SELECT Nombre, Limite_Deteccion, Limite_Cuantificacion, PNT
+            FROM dbo.MES_ensayos
+            WHERE ISNULL(Baja,0) = 0 AND Nombre IN (${inNames})
+          `, pr);
           const byName = new Map((ens||[]).map(r => [r.Nombre, r]));
           let pntMap = new Map();
           const pntCodes = Array.from(new Set((ens||[]).map(r => r.PNT).filter(Boolean)));
@@ -1012,7 +1021,11 @@ router.get('/:id/solicitud', async (req, res) => {
         if (names.length) {
           const pr = {};
           const inNames = names.map((v,i)=>{ pr['n'+i]=v; return '@n'+i; }).join(',');
-          const ens = await SQL.Query('read', `SELECT Nombre, Limite_Deteccion, Limite_Cuantificacion, PNT FROM dbo.MES_ensayos WHERE Nombre IN (${inNames})`, pr);
+          const ens = await SQL.Query('read', `
+            SELECT Nombre, Limite_Deteccion, Limite_Cuantificacion, PNT
+            FROM dbo.MES_ensayos
+            WHERE ISNULL(Baja,0) = 0 AND Nombre IN (${inNames})
+          `, pr);
           const byName = new Map((ens||[]).map(r => [r.Nombre, r]));
           let pntMap = new Map();
           const pntCodes = Array.from(new Set((ens||[]).map(r => r.PNT).filter(Boolean)));
@@ -1247,7 +1260,7 @@ router.post('/crear', async (req, res) => {
   }
 });
 
-// ð© Crear nueva cotizaciÃ³n
+// ð??© Crear nueva cotizaciÃ³n
 router.post('/agregar', async (req, res) => {
   try {
     const { Fecha, Descripcion, EmpleadoId, Descuento } = req.body;
@@ -1356,6 +1369,116 @@ router.get('/:id/eliminar', async (req, res) => {
 
 
 
+// Duplicar una cotizacion (crea nueva con fecha actual y Aprobada=0)
+router.post('/:id/duplicar', async (req, res) => {
+  const srcId = parseInt(req.params.id, 10);
+  if (isNaN(srcId)) return res.status(400).send('Id invalido');
+  try {
+    const headerRows = await SQL.Query('main', `
+      SELECT TOP 1 *
+      FROM laboratorio.Cotizacion
+      WHERE CotizacionId = @id
+    `, { id: srcId });
+    if (!Array.isArray(headerRows) || !headerRows.length) return res.status(404).send('Cotizacion no encontrada');
+    const h = headerRows[0];
+    const EmpleadoId = (req.logged && req.logged.EmpleadoId) ? req.logged.EmpleadoId : (h.EmpleadoId || null);
+    if (!EmpleadoId) return res.status(400).send('Empleado no encontrado en la sesion');
+    const Fecha = new Date().toISOString().slice(0, 10);
+
+    const inserted = await SQL.Query('main', `
+      INSERT INTO laboratorio.Cotizacion (
+        Fecha, Descripcion, EmpleadoId, Descuento, ClienteId, ContactoId,
+        Personal, PersonalPrecio, Operativos, OperativosPrecio,
+        Consideraciones, ConsideracionesPrecio, Informe, InformePrecio,
+        Otros, OtrosPrecio,
+        Moneda, TipoCambio,
+        Aprobada
+      )
+      OUTPUT INSERTED.CotizacionId AS CotizacionId
+      VALUES (
+        @Fecha, @Descripcion, @EmpleadoId, @Descuento, @ClienteId, @ContactoId,
+        @Personal, @PersonalPrecio, @Operativos, @OperativosPrecio,
+        @Consideraciones, @ConsideracionesPrecio, @Informe, @InformePrecio,
+        @Otros, @OtrosPrecio,
+        @Moneda, @TipoCambio,
+        0
+      )
+    `, {
+      Fecha,
+      Descripcion: h.Descripcion || '',
+      EmpleadoId,
+      Descuento: h.Descuento || 0,
+      ClienteId: h.ClienteId,
+      ContactoId: h.ContactoId,
+      Personal: h.Personal || '',
+      PersonalPrecio: h.PersonalPrecio || 0,
+      Operativos: h.Operativos || '',
+      OperativosPrecio: h.OperativosPrecio || 0,
+      Consideraciones: h.Consideraciones || '',
+      ConsideracionesPrecio: h.ConsideracionesPrecio || 0,
+      Informe: h.Informe || '',
+      InformePrecio: h.InformePrecio || 0,
+      Otros: h.Otros || '',
+      OtrosPrecio: h.OtrosPrecio || 0,
+      Moneda: (h.Moneda || 'PEN').toUpperCase(),
+      TipoCambio: h.TipoCambio || 1
+    });
+    if (!Array.isArray(inserted) || !inserted.length) throw new Error('No se pudo duplicar la cotizacion');
+    const newId = inserted[0].CotizacionId;
+
+    const itemsSrc = await SQL.Query('main', `
+      SELECT AnalisisId, Empresa, MatrizId, PrecioBase, Cantidad
+      FROM laboratorio.CotizacionAnalisis
+      WHERE CotizacionId = @id
+    `, { id: srcId });
+    if (Array.isArray(itemsSrc) && itemsSrc.length) {
+      for (const it of itemsSrc) {
+        await SQL.Query('main', `
+          INSERT INTO laboratorio.CotizacionAnalisis (CotizacionId, AnalisisId, Cantidad, PrecioBase, Empresa, MatrizId)
+          VALUES (@CotizacionId, @AnalisisId, @Cantidad, @PrecioBase, @Empresa, @MatrizId)
+        `, {
+          CotizacionId: newId,
+          AnalisisId: it.AnalisisId,
+          Cantidad: it.Cantidad,
+          PrecioBase: it.PrecioBase,
+          Empresa: it.Empresa,
+          MatrizId: it.MatrizId
+        });
+      }
+    }
+
+    const perfilesSrc = await loadCotizacionPerfiles(srcId);
+    const schemaCols = await getCotizacionPerfilesSchema();
+    const hasPrecioBaseCol = schemaCols.includes('preciobase');
+    const hasPrecioCol = schemaCols.includes('precio');
+    const hasPrecioUnitarioCol = schemaCols.includes('preciounitario');
+    const hasMatrizCol = schemaCols.includes('matrizid');
+    const precioColumn = hasPrecioBaseCol ? 'PrecioBase' : (hasPrecioCol ? 'Precio' : (hasPrecioUnitarioCol ? 'PrecioUnitario' : null));
+    for (const pf of (perfilesSrc || [])) {
+      const columns = ['CotizacionId', 'PerfilId', 'Nombre', 'Cantidad'];
+      const values = ['@CotizacionId', '@PerfilId', '@Nombre', '@Cantidad'];
+      if (precioColumn) { columns.push(precioColumn); values.push('@PrecioBase'); }
+      if (hasMatrizCol) { columns.push('MatrizId'); values.push('@MatrizId'); }
+      const sqlInsert = `
+        INSERT INTO laboratorio.CotizacionPerfiles (${columns.join(', ')})
+        VALUES (${values.join(', ')})
+      `;
+      await SQL.Query('main', sqlInsert, {
+        CotizacionId: newId,
+        PerfilId: pf.PerfilId,
+        Nombre: pf.Nombre || null,
+        Cantidad: pf.Cantidad || 1,
+        PrecioBase: pf.PrecioBase || 0,
+        MatrizId: pf.MatrizId ?? null
+      });
+    }
+
+    return res.redirect(`/cotizaciones/${newId}`);
+  } catch (e) {
+    console.error('Error al duplicar cotizacion:', e);
+    return res.status(500).send('Error al duplicar la cotizacion');
+  }
+});
 // Aprobar cotizacion (POST y GET fallback)
 router.post('/:id/aprobar', async (req, res) => {
   const id = parseInt(req.params.id, 10);
@@ -1553,6 +1676,8 @@ router.get('/:id/aprobar', async (req, res) => {
 });
 
 module.exports = router;
+
+
 
 
 

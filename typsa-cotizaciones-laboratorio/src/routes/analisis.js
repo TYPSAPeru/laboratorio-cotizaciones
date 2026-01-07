@@ -19,6 +19,7 @@ router.get('/', async (req, res) => {
         Limite_Deteccion,
         Limite_Cuantificacion
       FROM dbo.MES_ensayos
+      WHERE ISNULL(Baja,0) = 0
     `);
 
     // Catalogo de procedimientos para obtener el método
